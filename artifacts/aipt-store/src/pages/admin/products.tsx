@@ -105,10 +105,10 @@ export default function AdminProducts() {
           <div className="text-sm text-muted-foreground">Admin Panel</div>
         </div>
         <nav className="flex-1 p-4 space-y-1">
-          <Link href="/admin"><div className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-sidebar-accent/50 cursor-pointer">📊 Dashboard</div></Link>
-          <Link href="/admin/orders"><div className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-sidebar-accent/50 cursor-pointer">🛒 Orders</div></Link>
-          <Link href="/admin/products"><div className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium bg-sidebar-accent text-sidebar-accent-foreground cursor-pointer">📦 Products</div></Link>
-          <Link href="/admin/customers"><div className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-sidebar-accent/50 cursor-pointer">👥 Customers</div></Link>
+          <Link href="/admin"><div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-sidebar-accent/50 cursor-pointer">📊 Dashboard</div></Link>
+          <Link href="/admin/orders"><div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-sidebar-accent/50 cursor-pointer">🛒 Orders</div></Link>
+          <Link href="/admin/products"><div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium bg-sidebar-accent text-sidebar-accent-foreground cursor-pointer">📦 Products</div></Link>
+          <Link href="/admin/customers"><div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-sidebar-accent/50 cursor-pointer">👥 Customers</div></Link>
         </nav>
         <div className="p-4 border-t border-sidebar-border">
           <Link href="/"><Button variant="ghost" size="sm" className="w-full justify-start"><ArrowLeft className="h-4 w-4 mr-2" /> Back to Store</Button></Link>

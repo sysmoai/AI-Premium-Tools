@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useListProducts, useListCategories } from "@workspace/api-client-react";
+import { useInView } from "@/hooks/use-in-view";
+import { WHATSAPP_URL } from "@/config/contact";
 
 interface HomeProps {
   onAddToCart: (product: { productId: number; name: string; price_bdt: number; image_url?: string; duration_days?: number }) => void;
@@ -19,63 +21,154 @@ const CATEGORY_ICONS: Record<string, string> = {
   "freelancer-packages": "💼",
 };
 
+const CATEGORY_GRADIENTS: Record<string, string> = {
+  "ai-text": "from-violet-500 to-purple-600",
+  "ai-image": "from-pink-500 to-rose-600",
+  "ai-productivity": "from-blue-500 to-cyan-600",
+  "ai-video": "from-orange-500 to-red-600",
+  "student-packages": "from-green-500 to-emerald-600",
+  "freelancer-packages": "from-indigo-500 to-blue-600",
+};
+
+const TOOL_CHIPS = [
+  { name: "ChatGPT 4", emoji: "🤖", delay: "animate-float-d1", top: "12%", right: "6%", rotate: "-2deg" },
+  { name: "Midjourney", emoji: "🎨", delay: "animate-float-d2 animate-float-reverse", top: "32%", right: "22%", rotate: "2deg" },
+  { name: "Canva Pro", emoji: "✏️", delay: "animate-float-d3", top: "54%", right: "4%", rotate: "-1deg" },
+  { name: "Claude AI", emoji: "🧠", delay: "animate-float-d4 animate-float-reverse", top: "22%", right: "38%", rotate: "1.5deg" },
+  { name: "Notion AI", emoji: "📋", delay: "animate-float-d5", top: "68%", right: "28%", rotate: "-2deg" },
+];
+
+function getProductGradient(name: string): string {
+  const gradients = [
+    "from-violet-500 to-purple-600",
+    "from-blue-500 to-indigo-600",
+    "from-pink-500 to-rose-600",
+    "from-green-500 to-emerald-600",
+    "from-orange-500 to-amber-600",
+    "from-cyan-500 to-blue-600",
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash + name.charCodeAt(i)) % gradients.length;
+  return gradients[hash];
+}
+
 export default function Home({ onAddToCart }: HomeProps) {
   const { data: featured, isLoading: featuredLoading } = useListProducts({ featured: true, is_active: true });
   const { data: categories, isLoading: catsLoading } = useListCategories();
+  const { ref: statRef, inView: statInView } = useInView();
 
   return (
     <div className="min-h-screen">
-      {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[hsl(262,83%,10%)] via-[hsl(262,70%,18%)] to-[hsl(220,90%,20%)] text-white">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0ibTM2IDM0djItaC0ydi0yaDB6bTAtNHY0aC00di00aDR6bTQtNHY0aC00di00aDR6bTAgOHYtNGg0djRoLTR6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-40" />
-        <div className="relative max-w-6xl mx-auto px-4 py-24 md:py-32">
-          <div className="max-w-3xl">
+      <section
+        className="relative overflow-hidden text-white min-h-[580px] flex items-center"
+        style={{ background: "var(--gradient-hero)" }}
+      >
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: [
+              "radial-gradient(ellipse at 20% 30%, hsl(262 83% 30% / 0.7) 0px, transparent 55%)",
+              "radial-gradient(ellipse at 80% 10%, hsl(220 90% 28% / 0.6) 0px, transparent 50%)",
+              "radial-gradient(ellipse at 60% 70%, hsl(280 80% 22% / 0.5) 0px, transparent 50%)",
+            ].join(", "),
+          }}
+        />
+
+        <div className="hidden md:block absolute inset-0 pointer-events-none">
+          {TOOL_CHIPS.map(chip => (
+            <div
+              key={chip.name}
+              className={`absolute animate-float ${chip.delay}`}
+              style={{ top: chip.top, right: chip.right, transform: `rotate(${chip.rotate})` }}
+            >
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-3.5 py-2 text-sm font-medium shadow-lg">
+                <span className="text-base">{chip.emoji}</span>
+                <span className="text-white/90">{chip.name}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="relative max-w-6xl mx-auto px-4 py-24 md:py-32 w-full">
+          <div className="max-w-2xl">
             <Badge className="mb-6 bg-white/10 text-white border-white/20 backdrop-blur-sm px-4 py-1.5 text-sm">
-              Bangladesh's #1 Student AI Store
+              🇧🇩 Bangladesh's #1 Student AI Store
             </Badge>
-            <h1 className="text-5xl md:text-7xl font-black mb-6 leading-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            <h1 className="font-black mb-6 leading-tight" style={{ fontFamily: "Outfit, sans-serif", fontSize: "clamp(2.5rem, 6vw, 4.5rem)" }}>
               Superior AI,
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-violet-300 to-blue-300">
+              <span
+                className="block"
+                style={{
+                  background: "linear-gradient(90deg, #c4b5fd, #93c5fd, #6ee7b7)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}
+              >
                 Surprising Prices.
               </span>
+              <span className="block text-white/70 text-3xl md:text-4xl mt-1">Built for Bangladesh.</span>
             </h1>
-            <p className="text-xl text-white/80 mb-10 max-w-xl leading-relaxed">
-              Premium AI tools — ChatGPT, Midjourney, Canva Pro, and 25+ more — at 15-20% below market price. Built for Bangladeshi students and freelancers.
+            <p className="text-lg text-white/80 mb-10 max-w-xl leading-relaxed">
+              Premium AI tools — ChatGPT, Midjourney, Canva Pro, and 25+ more — at 15–20% below market price.
             </p>
             <div className="flex flex-wrap gap-4">
               <Link href="/products">
-                <Button size="lg" className="bg-white text-purple-900 hover:bg-white/90 font-bold px-8 h-14 text-base rounded-full" data-testid="btn-shop-now">
+                <Button
+                  size="lg"
+                  className="font-bold px-8 h-14 text-base rounded-full shadow-lg transition-transform hover:scale-105"
+                  style={{ background: "white", color: "hsl(262 83% 30%)" }}
+                  data-testid="btn-shop-now"
+                >
                   Shop All Tools <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
               <Link href="/products?category_id=5">
-                <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 px-8 h-14 text-base rounded-full" data-testid="btn-student-packs">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="border-white/30 text-white hover:bg-white/10 px-8 h-14 text-base rounded-full"
+                  data-testid="btn-student-packs"
+                >
                   Student Packages
                 </Button>
               </Link>
             </div>
-            <div className="mt-12 flex flex-wrap gap-8 text-white/70 text-sm">
-              <div className="flex items-center gap-2"><Shield className="h-4 w-4 text-violet-300" /> Trusted by 1000+ students</div>
-              <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-violet-300" /> Access within 1 hour</div>
-              <div className="flex items-center gap-2"><Star className="h-4 w-4 text-violet-300" /> 4.9/5 rating</div>
+            <div className="mt-12 flex flex-wrap gap-6 text-white/70 text-sm">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-violet-300" /> Trusted by 1000+ students
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-violet-300" /> Access within 1 hour
+              </div>
+              <div className="flex items-center gap-2">
+                <Star className="h-4 w-4 text-violet-300" /> 4.9/5 rating
+              </div>
             </div>
           </div>
         </div>
-        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-background to-transparent" />
       </section>
 
-      {/* Stats Bar */}
-      <section className="bg-primary text-primary-foreground py-6">
-        <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+      <section
+        ref={statRef as React.RefObject<HTMLElement>}
+        className="relative py-5 transition-all duration-700"
+        style={{
+          background: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary)))",
+          opacity: statInView ? 1 : 0,
+          transform: statInView ? "translateY(0)" : "translateY(24px)",
+        }}
+      >
+        <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-6 text-center text-white">
           {[
             { label: "AI Tools", value: "29+" },
             { label: "Happy Students", value: "1000+" },
             { label: "Avg Savings", value: "20%" },
-            { label: "Delivery Time", value: "1hr" },
+            { label: "Delivery Time", value: "1 hr" },
           ].map(stat => (
-            <div key={stat.label}>
-              <div className="text-2xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>{stat.value}</div>
-              <div className="text-primary-foreground/70 text-sm">{stat.label}</div>
+            <div key={stat.label} className="py-2">
+              <div className="text-2xl font-black" style={{ fontFamily: "Outfit, sans-serif" }}>{stat.value}</div>
+              <div className="text-white/75 text-sm mt-0.5">{stat.label}</div>
             </div>
           ))}
         </div>
@@ -83,24 +176,52 @@ export default function Home({ onAddToCart }: HomeProps) {
 
       {/* Categories */}
       <section className="max-w-6xl mx-auto px-4 py-16">
-        <h2 className="text-3xl font-bold mb-8" style={{ fontFamily: 'Outfit, sans-serif' }}>Browse by Category</h2>
+        <h2 className="text-3xl font-bold mb-8" style={{ fontFamily: "Outfit, sans-serif" }}>Browse by Category</h2>
         {catsLoading ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+            {Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {categories?.map(cat => (
-              <Link key={cat.id} href={`/products?category_id=${cat.id}`}>
-                <Card className="hover:border-primary hover:shadow-md transition-all cursor-pointer group text-center" data-testid={`card-category-${cat.id}`}>
-                  <CardContent className="p-5">
-                    <div className="text-3xl mb-2">{CATEGORY_ICONS[cat.slug] || "🤖"}</div>
-                    <div className="font-semibold text-sm leading-tight group-hover:text-primary">{cat.name}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{cat.product_count} tools</div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+            {/* All Tools card */}
+            <Link href="/products">
+              <Card className="hover:border-primary hover:shadow-lg transition-all cursor-pointer group text-center" data-testid="card-category-all">
+                <CardContent className="p-4 flex flex-col items-center gap-2.5">
+                  <div className="h-12 w-12 rounded-lg flex items-center justify-center text-xl shadow-md bg-gradient-to-br from-slate-500 to-gray-600 group-hover:scale-110 transition-transform">
+                    🔮
+                  </div>
+                  <div className="font-bold text-sm leading-tight group-hover:text-primary transition-colors">All Tools</div>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                    29+ tools
+                  </span>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {categories?.map(cat => {
+              const gradient = CATEGORY_GRADIENTS[cat.slug] || "from-primary to-secondary";
+              const icon = CATEGORY_ICONS[cat.slug] || "🤖";
+              return (
+                <Link key={cat.id} href={`/products?category_id=${cat.id}`}>
+                  <Card
+                    className="hover:border-primary hover:shadow-lg transition-all cursor-pointer group text-center"
+                    data-testid={`card-category-${cat.id}`}
+                  >
+                    <CardContent className="p-4 flex flex-col items-center gap-2.5">
+                      <div
+                        className={`h-12 w-12 rounded-lg flex items-center justify-center text-xl shadow-md bg-gradient-to-br ${gradient} group-hover:scale-110 transition-transform`}
+                      >
+                        {icon}
+                      </div>
+                      <div className="font-bold text-sm leading-tight group-hover:text-primary transition-colors">{cat.name}</div>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                        {cat.product_count} tools
+                      </span>
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
           </div>
         )}
       </section>
@@ -108,7 +229,7 @@ export default function Home({ onAddToCart }: HomeProps) {
       {/* Featured Products */}
       <section className="max-w-6xl mx-auto px-4 pb-16">
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-3xl font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Featured Tools</h2>
+          <h2 className="text-3xl font-bold" style={{ fontFamily: "Outfit, sans-serif" }}>Featured Tools</h2>
           <Link href="/products">
             <Button variant="ghost" className="text-primary" data-testid="link-view-all">
               View all <ChevronRight className="h-4 w-4 ml-1" />
@@ -117,64 +238,106 @@ export default function Home({ onAddToCart }: HomeProps) {
         </div>
         {featuredLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-64 rounded-2xl" />)}
+            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-72 rounded-lg" />)}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featured?.map(product => (
-              <Card key={product.id} className="group hover:shadow-lg hover:-translate-y-1 transition-all duration-300" data-testid={`card-product-${product.id}`}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      {product.is_featured && <Badge className="mb-2 bg-primary/10 text-primary border-0 text-xs">Featured</Badge>}
-                      <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors">{product.name}</h3>
-                      <p className="text-muted-foreground text-sm mt-1 line-clamp-2">{product.description}</p>
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    {product.features?.slice(0, 3).map(f => (
-                      <div key={f} className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
-                        {f}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-5 flex items-center justify-between">
-                    <div>
-                      {product.original_price_bdt && (
-                        <div className="text-sm text-muted-foreground line-through">৳{product.original_price_bdt}</div>
+            {featured?.map(product => {
+              const gradient = getProductGradient(product.name);
+              const initial = product.name.charAt(0).toUpperCase();
+              const savingsPct = product.original_price_bdt
+                ? Math.round((1 - product.price_bdt / product.original_price_bdt) * 100)
+                : 0;
+              return (
+                <Card
+                  key={product.id}
+                  className="group hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 overflow-hidden"
+                  data-testid={`card-product-${product.id}`}
+                >
+                  <div className={`relative h-20 bg-gradient-to-br ${gradient} flex items-center justify-center overflow-hidden`}>
+                    <span className="text-5xl font-black text-white/30 select-none absolute" style={{ fontFamily: "Outfit, sans-serif" }}>
+                      {initial}
+                    </span>
+                    <span className="text-4xl font-black text-white relative z-10 drop-shadow-md" style={{ fontFamily: "Outfit, sans-serif" }}>
+                      {initial}
+                    </span>
+                    <div className="absolute top-2 left-2 flex flex-col gap-1">
+                      {product.is_featured && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-white/20 text-white border border-white/30 backdrop-blur-sm">
+                          ⭐ Featured
+                        </span>
                       )}
-                      <div className="text-2xl font-black text-primary" style={{ fontFamily: 'Outfit, sans-serif' }}>৳{product.price_bdt}</div>
-                      <div className="text-xs text-muted-foreground">{product.duration_days || 30} days</div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Link href={`/products/${product.id}`}>
-                        <Button variant="outline" size="sm" data-testid={`btn-details-${product.id}`}>Details</Button>
-                      </Link>
-                      <Button size="sm" onClick={() => onAddToCart({ productId: product.id, name: product.name, price_bdt: product.price_bdt, image_url: product.image_url ?? undefined, duration_days: product.duration_days ?? undefined })} data-testid={`btn-add-cart-${product.id}`}>
-                        Add to Cart
-                      </Button>
+                      {savingsPct > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500/80 text-white backdrop-blur-sm">
+                          Save {savingsPct}%
+                        </span>
+                      )}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+
+                  <CardContent className="p-5">
+                    <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors mb-1.5">
+                      {product.name}
+                    </h3>
+                    <p className="text-muted-foreground text-sm line-clamp-2 mb-3">{product.description}</p>
+                    <div className="space-y-1 mb-4">
+                      {product.features?.slice(0, 3).map(f => (
+                        <div key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+                          {f}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-end justify-between mt-4 pt-3 border-t border-border">
+                      <div>
+                        {product.original_price_bdt && (
+                          <div className="text-xs text-muted-foreground line-through">৳{product.original_price_bdt}</div>
+                        )}
+                        <div className="text-2xl font-black text-primary" style={{ fontFamily: "Outfit, sans-serif" }}>
+                          ৳{product.price_bdt}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{product.duration_days || 30} days</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Link href={`/products/${product.id}`}>
+                          <Button variant="outline" size="sm" data-testid={`btn-details-${product.id}`}>Details</Button>
+                        </Link>
+                        <Button
+                          size="sm"
+                          onClick={() => onAddToCart({ productId: product.id, name: product.name, price_bdt: product.price_bdt, image_url: product.image_url ?? undefined, duration_days: product.duration_days ?? undefined })}
+                          data-testid={`btn-add-cart-${product.id}`}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </section>
 
       {/* Why Choose AIPT */}
-      <section className="bg-muted/40 py-16">
+      <section className="py-16" style={{ background: "hsl(var(--muted) / 0.4)" }}>
         <div className="max-w-6xl mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12" style={{ fontFamily: 'Outfit, sans-serif' }}>Why Students Choose AIPT</h2>
+          <h2 className="text-3xl font-bold text-center mb-12" style={{ fontFamily: "Outfit, sans-serif" }}>
+            Why Students Choose AIPT
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { icon: <Zap className="h-6 w-6" />, title: "15-20% Lower Prices", desc: "We pass the savings directly to students. Same tools, better price — always." },
+              { icon: <Zap className="h-6 w-6" />, title: "15–20% Lower Prices", desc: "We pass the savings directly to students. Same tools, better price — always." },
               { icon: <Users className="h-6 w-6" />, title: "Student-First Packages", desc: "8 exclusive bundles designed for university life — research, design, writing, and more." },
               { icon: <Clock className="h-6 w-6" />, title: "Access in 1 Hour", desc: "Pay via bKash, Nagad, or bank transfer. Get your AI tools delivered within 1 hour." },
             ].map(item => (
               <div key={item.title} className="text-center">
-                <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-primary text-primary-foreground mb-4">{item.icon}</div>
+                <div
+                  className="inline-flex items-center justify-center h-14 w-14 rounded-lg text-primary-foreground mb-4 shadow-lg"
+                  style={{ background: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary)))" }}
+                >
+                  {item.icon}
+                </div>
                 <h3 className="font-bold text-xl mb-2">{item.title}</h3>
                 <p className="text-muted-foreground">{item.desc}</p>
               </div>
@@ -183,15 +346,44 @@ export default function Home({ onAddToCart }: HomeProps) {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="max-w-6xl mx-auto px-4 py-16 text-center">
-        <h2 className="text-4xl font-black mb-4" style={{ fontFamily: 'Outfit, sans-serif' }}>Ready to level up?</h2>
-        <p className="text-muted-foreground text-lg mb-8">Join 1000+ Bangladeshi students already using AIPT tools.</p>
-        <Link href="/products">
-          <Button size="lg" className="rounded-full px-10 h-14 text-base font-bold" data-testid="btn-cta-shop">
-            Get Started Today <ArrowRight className="ml-2 h-5 w-5" />
-          </Button>
-        </Link>
+      <section className="max-w-6xl mx-auto px-4 py-20 text-center">
+        <div
+          className="rounded-lg p-12 relative overflow-hidden"
+          style={{
+            background: "var(--surface-elevated)",
+            border: "1px solid hsl(var(--primary) / 0.15)",
+            boxShadow: "0 4px 40px hsl(var(--primary) / 0.06)",
+          }}
+        >
+          <div
+            className="absolute inset-0 opacity-30"
+            style={{
+              backgroundImage: "radial-gradient(ellipse at 50% 0%, hsl(var(--primary) / 0.15) 0px, transparent 70%)",
+            }}
+          />
+          <h2 className="relative text-4xl font-black mb-4" style={{ fontFamily: "Outfit, sans-serif" }}>Ready to level up?</h2>
+          <p className="relative text-muted-foreground text-lg mb-8">Join 1000+ Bangladeshi students already using AIPT tools.</p>
+          <div className="relative flex flex-wrap gap-4 justify-center">
+            <Link href="/products">
+              <Button
+                size="lg"
+                className="rounded-full px-10 h-14 text-base font-bold shadow-lg hover:scale-105 transition-transform"
+                data-testid="btn-cta-shop"
+              >
+                Get Started Today <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-8 h-14 rounded-full text-white font-bold shadow-lg hover:scale-105 transition-transform"
+              style={{ background: "linear-gradient(135deg, #25d366, #128c7e)" }}
+            >
+              Chat on WhatsApp
+            </a>
+          </div>
+        </div>
       </section>
     </div>
   );
