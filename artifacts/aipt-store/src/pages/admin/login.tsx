@@ -125,6 +125,7 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
               <Input
                 id="password"
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Enter your password"
