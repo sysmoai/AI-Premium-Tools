@@ -47,14 +47,14 @@ export function ProductLogoBanner({
   const initialBig = size === "detail" ? "text-9xl" : "text-5xl";
   const initialSmall = size === "detail" ? "text-7xl" : "text-4xl";
   const dropShadow = size === "detail" ? "drop-shadow-xl" : "drop-shadow-md";
-  const containerH = size === "detail" ? "h-40" : "h-20";
-  const badgePosition = size === "detail" ? "bottom-3 right-3" : "top-2 left-2";
+  const containerH = size === "detail" ? "h-48" : "h-20";
+  const badgePosition = size === "detail" ? "top-3 right-3" : "top-2 left-2";
   const badgePad = size === "detail" ? "px-2.5 py-1" : "px-2 py-0.5";
-  const rounded = size === "detail" ? "rounded-lg" : "";
+  const rounded = size === "detail" ? "rounded-2xl" : "";
 
   return (
     <div
-      className={`relative ${containerH} ${rounded} ${showGradient ? `bg-gradient-to-br ${gradient}` : "bg-white"} flex items-center justify-center overflow-hidden ${className}`}
+      className={`relative ${containerH} ${rounded} ${showGradient ? `bg-gradient-to-br ${gradient}` : "bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700"} flex items-center justify-center overflow-hidden ${className}`}
     >
       {imageUrl && !imgError && (
         <img

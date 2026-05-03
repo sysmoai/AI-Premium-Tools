@@ -36,11 +36,13 @@ const CATEGORY_GRADIENTS: Record<string, string> = {
 };
 
 const TOOL_CHIPS = [
-  { name: "ChatGPT 5", emoji: "🤖", delay: "animate-float-d1", top: "12%", right: "6%", rotate: "-2deg" },
-  { name: "Midjourney", emoji: "🎨", delay: "animate-float-d2 animate-float-reverse", top: "32%", right: "22%", rotate: "2deg" },
-  { name: "Canva Pro", emoji: "✏️", delay: "animate-float-d3", top: "54%", right: "4%", rotate: "-1deg" },
-  { name: "Claude AI", emoji: "🧠", delay: "animate-float-d4 animate-float-reverse", top: "22%", right: "38%", rotate: "1.5deg" },
-  { name: "Notion AI", emoji: "📋", delay: "animate-float-d5", top: "68%", right: "28%", rotate: "-2deg" },
+  { name: "ChatGPT 5", emoji: "🤖", delay: "animate-float-d1", top: "10%", right: "6%", rotate: "-2deg" },
+  { name: "Midjourney", emoji: "🎨", delay: "animate-float-d2 animate-float-reverse", top: "28%", right: "22%", rotate: "2deg" },
+  { name: "Canva Pro", emoji: "✏️", delay: "animate-float-d3", top: "48%", right: "4%", rotate: "-1deg" },
+  { name: "Claude AI", emoji: "🧠", delay: "animate-float-d4 animate-float-reverse", top: "20%", right: "38%", rotate: "1.5deg" },
+  { name: "Notion AI", emoji: "📋", delay: "animate-float-d5", top: "62%", right: "28%", rotate: "-2deg" },
+  { name: "Grammarly", emoji: "✨", delay: "animate-float-d2", top: "78%", right: "8%", rotate: "1deg" },
+  { name: "Perplexity", emoji: "🔍", delay: "animate-float-d4", top: "40%", right: "42%", rotate: "-1.5deg" },
 ];
 
 export default function Home({ onAddToCart }: HomeProps) {
@@ -190,7 +192,7 @@ export default function Home({ onAddToCart }: HomeProps) {
               >
                 Subscriptions
               </span>
-              <span className="block text-white/70 text-3xl md:text-4xl mt-1">for All in Bangladesh.</span>
+              <span className="block text-white text-3xl md:text-4xl mt-1 font-bold">for All in Bangladesh.</span>
             </h1>
             <p className="text-lg text-white/80 mb-10 max-w-xl leading-relaxed">
               Your trusted partner for affordable educational and freelancing tool subscriptions. Premium AI tools at prices everyone can afford.

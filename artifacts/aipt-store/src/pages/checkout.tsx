@@ -83,9 +83,53 @@ export default function Checkout({ items, total, onClearCart }: CheckoutProps) {
 
   if (items.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-20 text-center">
-        <h2 className="text-2xl font-bold mb-4">Your cart is empty</h2>
-        <Link href="/products"><Button data-testid="btn-go-shop">Shop Now</Button></Link>
+      <div className="max-w-3xl mx-auto px-4 py-16 md:py-20">
+        <Card className="overflow-hidden border-2 border-dashed" style={{ borderColor: "hsl(var(--primary) / 0.25)" }}>
+          <CardContent className="p-10 md:p-14 text-center">
+            <div
+              className="inline-flex h-20 w-20 rounded-2xl items-center justify-center text-white mb-6 shadow-xl"
+              style={{ background: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary)))" }}
+            >
+              <ShoppingCart className="h-10 w-10" />
+            </div>
+            <h2 className="text-3xl md:text-4xl font-black mb-3" style={{ fontFamily: "Outfit, sans-serif" }}>
+              Nothing to check out yet
+            </h2>
+            <p className="text-muted-foreground text-base max-w-md mx-auto mb-8 leading-relaxed">
+              Your cart is empty. Browse our premium AI subscriptions — pay in BDT and get access on WhatsApp within 1 hour.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Link href="/products">
+                <Button
+                  size="lg"
+                  className="font-bold px-8 h-12 rounded-full"
+                  data-testid="btn-go-shop"
+                >
+                  Shop All Tools
+                </Button>
+              </Link>
+              <Link href="/track-order">
+                <Button size="lg" variant="outline" className="font-semibold px-6 h-12 rounded-full">
+                  Track an order
+                </Button>
+              </Link>
+            </div>
+            <div className="mt-10 grid grid-cols-3 gap-4 max-w-md mx-auto pt-8 border-t border-border">
+              {[
+                { v: "1 hr", l: "Activation" },
+                { v: "30-day", l: "Warranty" },
+                { v: "BDT", l: "bKash · Nagad" },
+              ].map(s => (
+                <div key={s.l} className="text-center">
+                  <div className="text-base md:text-lg font-black text-primary" style={{ fontFamily: "Outfit, sans-serif" }}>
+                    {s.v}
+                  </div>
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mt-0.5">{s.l}</div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }

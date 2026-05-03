@@ -230,20 +230,65 @@ export default function TrackOrder() {
       )}
 
       {!order && (
-        <div className="text-center text-sm text-muted-foreground mt-8">
-          Lost your order ID?{" "}
-          <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="text-primary font-medium hover:underline">
-            Message us on WhatsApp
-          </a>{" "}
-          and we'll find it for you.
-          <div className="mt-6">
-            <Link href="/products">
-              <Button variant="outline" className="gap-1">
-                Continue shopping <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
+        <>
+          <Card className="mb-6 border-dashed" data-testid="card-status-preview">
+            <CardContent className="p-6 md:p-8">
+              <div className="text-xs font-bold uppercase tracking-wider text-primary mb-4">
+                What you'll see
+              </div>
+              <ol className="space-y-5">
+                {[
+                  {
+                    Icon: Clock,
+                    title: "Awaiting payment confirmation",
+                    desc: "We verify your bKash / Nagad / bank transaction. Usually under 30 minutes (10am–11pm BD).",
+                    tone: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
+                  },
+                  {
+                    Icon: AlertCircle,
+                    title: "Payment confirmed — preparing your account",
+                    desc: "We're sourcing your account from official channels and getting it ready for delivery.",
+                    tone: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+                  },
+                  {
+                    Icon: CheckCircle,
+                    title: "Delivered to WhatsApp",
+                    desc: "Login credentials sent — usually within 1 hour. 30-day replacement warranty kicks in.",
+                    tone: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+                  },
+                ].map((s, i, arr) => (
+                  <li key={s.title} className="flex items-start gap-4 relative">
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${s.tone}`}>
+                      <s.Icon className="h-5 w-5" />
+                    </div>
+                    {i < arr.length - 1 && (
+                      <div className="absolute left-5 top-10 bottom-[-1.25rem] w-px bg-border" />
+                    )}
+                    <div className="flex-1 pt-1">
+                      <div className="font-semibold text-sm">{s.title}</div>
+                      <div className="text-sm text-muted-foreground mt-1 leading-relaxed">{s.desc}</div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </CardContent>
+          </Card>
+
+          <div className="text-center text-sm text-muted-foreground mt-8">
+            Lost your order ID?{" "}
+            <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="text-primary font-medium hover:underline">
+              Message us on WhatsApp
+            </a>{" "}
+            and we'll find it for you.
+            <div className="mt-6">
+              <Link href="/products">
+                <Button variant="outline" className="gap-1">
+                  Continue shopping <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
