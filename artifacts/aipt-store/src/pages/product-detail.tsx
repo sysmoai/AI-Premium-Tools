@@ -517,6 +517,29 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
                   </div>
                 </div>
 
+                {/* "vs direct" comparison block — AIO/conversion */}
+                {product.original_price_bdt && savingsAmt > 0 && (
+                  <div className="mb-5 rounded-lg overflow-hidden border" data-testid="block-vs-direct">
+                    <div className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-white" style={{ background: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary)))" }}>
+                      AIPT vs buying direct
+                    </div>
+                    <div className="divide-y">
+                      <div className="flex items-center justify-between px-4 py-2.5 text-sm">
+                        <span className="text-muted-foreground">Direct vendor (after BD VAT + FX)</span>
+                        <span className="font-semibold line-through">৳{product.original_price_bdt.toLocaleString("en-BD")}</span>
+                      </div>
+                      <div className="flex items-center justify-between px-4 py-2.5 text-sm bg-green-50 dark:bg-green-950/30">
+                        <span className="font-semibold">AIPT — {durationDays} days</span>
+                        <span className="font-black text-green-700 dark:text-green-400">৳{product.price_bdt.toLocaleString("en-BD")}</span>
+                      </div>
+                      <div className="flex items-center justify-between px-4 py-2.5 text-sm">
+                        <span className="text-muted-foreground">You save</span>
+                        <span className="font-bold text-primary">৳{savingsAmt.toLocaleString("en-BD")} ({savings}% off)</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Trust quick list */}
                 <div className="space-y-2.5 mb-6 rounded-lg p-4" style={{ background: "hsl(var(--muted) / 0.4)" }}>
                   <div className="flex items-center gap-2 text-sm">

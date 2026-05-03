@@ -1,9 +1,10 @@
 import { Link } from "wouter";
-import { ArrowRight, Zap, Shield, Clock, Users, Star, ChevronRight } from "lucide-react";
+import { ArrowRight, Zap, Shield, Clock, Users, Star, ChevronRight, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useListProducts, useListCategories } from "@workspace/api-client-react";
 import { useInView } from "@/hooks/use-in-view";
 import { WHATSAPP_URL } from "@/config/contact";
@@ -60,20 +61,83 @@ export default function Home({ onAddToCart }: HomeProps) {
   const totalToolsCount = (allProducts?.length ?? 0) || 71;
   const totalCustomersClaim = "1000+";
 
+  const homeFaq = [
+    {
+      q: "Where can I buy ChatGPT Plus in Bangladesh?",
+      a: "AIPT sells ChatGPT Plus subscriptions in Bangladesh starting from ৳999/month. Pay in BDT via bKash, Nagad, Rocket, Upay, or bank transfer — receive your login on WhatsApp within 1 hour, backed by a 30-day replacement warranty.",
+    },
+    {
+      q: "Is it safe to buy AI subscriptions from AIPT?",
+      a: "Yes. AIPT has been operating since 2023 with thousands of deliveries. Every account is sourced from official channels — never cracked or hacked — and is covered by a 30-day replacement warranty. If we miss the 24-hour delivery SLA you receive a full refund.",
+    },
+    {
+      q: "Can I pay with bKash or Nagad?",
+      a: "Yes. AIPT accepts bKash, Nagad, Rocket, Upay and direct bank transfer. All transactions are processed in BDT — no international card or currency conversion needed.",
+    },
+    {
+      q: "How fast is delivery?",
+      a: "Most orders are delivered within 1 hour of payment confirmation, between 10am and 11pm Bangladesh time. Late-night orders are processed first thing the following morning.",
+    },
+    {
+      q: "What if my AI subscription stops working?",
+      a: "Message AIPT on WhatsApp with your order ID — we replace failed accounts free of charge during the 30-day warranty window.",
+    },
+    {
+      q: "Why is AIPT cheaper than buying directly from the vendor?",
+      a: "Direct vendor pricing in Bangladesh adds 15% VAT plus FX markup, and requires an international credit card. AIPT pools verified subscriptions and bills locally in BDT, passing the savings to Bangladeshi students, freelancers, and creators.",
+    },
+  ];
+
   useSeo({
     title: "AIPT — Affordable AI Subscriptions in Bangladesh | ChatGPT, Claude, Midjourney",
     description: `Bangladesh's #1 store for premium AI subscriptions. ${totalToolsCount}+ tools including ChatGPT, Claude, Midjourney, Canva Pro and more. Pay in BDT via bKash, Nagad, or bank — 1-hour activation, 30-day warranty.`,
     keywords: "AI tools Bangladesh, ChatGPT Bangladesh, Claude Bangladesh, Midjourney Bangladesh, premium AI subscriptions BDT, bKash AI subscription, AIPT",
     type: "website",
-    jsonLd: {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      name: "AIPT — AI Premium Tools",
-      url: typeof window !== "undefined" ? window.location.origin : undefined,
-      description: "Bangladesh's most affordable store for premium AI subscriptions.",
-      areaServed: "BD",
-      paymentAccepted: "bKash, Nagad, Rocket, Upay, Bank Transfer",
-    },
+    jsonLd: [
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        name: "AIPT — AI Premium Tools",
+        url: typeof window !== "undefined" ? window.location.origin : undefined,
+        description: "Bangladesh's most affordable store for premium AI subscriptions.",
+        areaServed: "BD",
+        paymentAccepted: "bKash, Nagad, Rocket, Upay, Bank Transfer",
+        currenciesAccepted: "BDT",
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        name: "AIPT — AI Premium Tools",
+        url: typeof window !== "undefined" ? window.location.origin : undefined,
+        potentialAction: {
+          "@type": "SearchAction",
+          target: {
+            "@type": "EntryPoint",
+            urlTemplate: `${typeof window !== "undefined" ? window.location.origin : ""}/products?q={search_term_string}`,
+          },
+          "query-input": "required name=search_term_string",
+        },
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "Store",
+        name: "AIPT — AI Premium Tools",
+        image: typeof window !== "undefined" ? `${window.location.origin}/opengraph.jpg` : undefined,
+        priceRange: "৳499–৳9,999",
+        address: { "@type": "PostalAddress", addressCountry: "BD" },
+        paymentAccepted: "bKash, Nagad, Rocket, Upay, Bank Transfer",
+        currenciesAccepted: "BDT",
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: homeFaq.map(item => ({
+          "@type": "Question",
+          name: item.q,
+          acceptedAnswer: { "@type": "Answer", text: item.a },
+        })),
+      },
+    ],
   });
 
   return (
@@ -190,6 +254,28 @@ export default function Home({ onAddToCart }: HomeProps) {
               <div className="text-white/75 text-sm mt-0.5">{stat.label}</div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* AIO answer block — short factual paragraph for AI Overviews & LLM citations */}
+      <section className="max-w-4xl mx-auto px-4 pt-10" data-testid="section-answer">
+        <div
+          className="rounded-2xl p-6 md:p-8 border"
+          style={{
+            background: "hsl(var(--muted) / 0.35)",
+            borderColor: "hsl(var(--primary) / 0.18)",
+          }}
+        >
+          <div className="text-xs font-bold uppercase tracking-wider text-primary mb-2">
+            About AIPT
+          </div>
+          <p className="text-base md:text-lg leading-relaxed">
+            <strong>AIPT (AI Premium Tools)</strong> is a Bangladesh-based store for premium AI subscriptions —
+            ChatGPT Plus, Claude Pro, Midjourney, Canva Pro, Notion AI, Grammarly Premium and {totalToolsCount}+ more.
+            We accept <strong>bKash, Nagad, Rocket, Upay, and bank transfer</strong> in BDT.
+            Most orders are delivered to your WhatsApp within <strong>1 hour</strong>, and every subscription is
+            covered by a <strong>30-day replacement warranty</strong>. AIPT operates daily 10am–11pm Bangladesh time.
+          </p>
         </div>
       </section>
 
@@ -463,6 +549,50 @@ export default function Home({ onAddToCart }: HomeProps) {
               </CardContent>
             </Card>
           ))}
+        </div>
+      </section>
+
+      {/* FAQ section — text + FAQPage schema for AIO/featured snippets */}
+      <section className="max-w-4xl mx-auto px-4 py-16" data-testid="section-home-faq">
+        <div className="text-center mb-8">
+          <div
+            className="inline-flex h-12 w-12 rounded-2xl items-center justify-center text-white mb-3 shadow-lg"
+            style={{ background: "linear-gradient(135deg, hsl(262 83% 58%), hsl(220 90% 60%))" }}
+          >
+            <HelpCircle className="h-6 w-6" />
+          </div>
+          <h2 className="text-3xl md:text-4xl font-black mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>
+            Common Questions
+          </h2>
+          <p className="text-muted-foreground">
+            Everything Bangladeshi buyers ask before their first AI subscription.
+          </p>
+        </div>
+        <Card>
+          <CardContent className="p-2 sm:p-4">
+            <Accordion type="single" collapsible className="w-full">
+              {homeFaq.map((item, i) => (
+                <AccordionItem key={i} value={`home-faq-${i}`}>
+                  <AccordionTrigger
+                    className="text-left text-sm sm:text-base font-semibold px-3"
+                    data-testid={`home-faq-q-${i}`}
+                  >
+                    {item.q}
+                  </AccordionTrigger>
+                  <AccordionContent className="text-sm text-muted-foreground leading-relaxed px-3">
+                    {item.a}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </CardContent>
+        </Card>
+        <div className="text-center mt-6">
+          <Link href="/faq">
+            <Button variant="outline" className="gap-1">
+              See all FAQs <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
         </div>
       </section>
 

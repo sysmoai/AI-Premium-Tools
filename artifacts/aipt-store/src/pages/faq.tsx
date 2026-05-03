@@ -88,6 +88,31 @@ const FAQ_GROUPS: Array<{ title: string; items: FaqItem[] }> = [
     ],
   },
   {
+    title: "Bangla / বাংলা",
+    items: [
+      {
+        q: "bKash দিয়ে ChatGPT Plus কিনতে পারব?",
+        a: "জি — AIPT তে bKash, Nagad, Rocket, Upay এবং bank transfer accept করি। Order place করুন, payment send করুন, ১ ঘণ্টার মধ্যে WhatsApp এ login পেয়ে যাবেন।",
+      },
+      {
+        q: "Account renew হচ্ছে না, কী করব?",
+        a: "WhatsApp এ আপনার order ID ও screenshot পাঠান। আমরা ২ ঘণ্টার মধ্যে renewal বা cancel করে দিই — এটা আমাদের warranty এর অংশ।",
+      },
+      {
+        q: "Bangla support আছে?",
+        a: "জি, আমাদের WhatsApp support পুরোপুরি bilingual — Bangla এবং English উভয় ভাষায়, প্রতিদিন সকাল ১০টা থেকে রাত ১১টা পর্যন্ত।",
+      },
+      {
+        q: "Account কি genuine? Cracked না তো?",
+        a: "প্রতিটি account official source থেকে আসে — কোনো cracked / hacked account না। সেজন্যই ৩০ দিনের replacement warranty দিতে পারি। কাজ না করলে free replace।",
+      },
+      {
+        q: "Job seeker হিসেবে কোন bundle ভালো?",
+        a: "Job Seeker Pack: ChatGPT (CV/cover letter), Grammarly (English edit), Quillbot (paraphrasing) — তিনটি tool ৩০ দিনের জন্য sub-bundle pricing এ। /products এ Student Packages section দেখুন।",
+      },
+    ],
+  },
+  {
     title: "For Resellers & Bulk Buyers",
     items: [
       {

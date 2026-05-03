@@ -54,6 +54,7 @@ export default function Products({ onAddToCart }: ProductsProps) {
   const totalCount = allProducts?.length ?? 0;
 
   const activeCat = categories?.find(c => c.id === selectedCategory);
+  const ORIGIN = typeof window !== "undefined" ? window.location.origin : "https://aipt.com.bd";
   useSeo({
     title: searchQuery
       ? `Search: ${searchQuery} — AI Tools in Bangladesh`
@@ -65,6 +66,49 @@ export default function Products({ onAddToCart }: ProductsProps) {
       : `${totalCount}+ premium AI tools at student-friendly prices. ChatGPT, Claude, Midjourney, Canva Pro and more — paid in BDT, activated in 1 hour.`,
     keywords: "AI tools Bangladesh, premium AI subscriptions, ChatGPT BDT, Claude BDT, Midjourney BDT, bKash AI",
     type: "website",
+    jsonLd: [
+      {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        name: activeCat ? `${activeCat.name} — AI Tools in Bangladesh` : "All AI Tools in Bangladesh",
+        description: activeCat
+          ? `${activeCat.name} subscriptions available at AIPT in BDT.`
+          : `${totalCount}+ premium AI subscriptions available in BDT at AIPT.`,
+        isPartOf: {
+          "@type": "WebSite",
+          name: "AIPT — AI Premium Tools",
+          url: typeof window !== "undefined" ? window.location.origin : undefined,
+        },
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: `${ORIGIN}/` },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: activeCat ? activeCat.name : "All Tools",
+            item: activeCat ? `${ORIGIN}/products?category_id=${activeCat.id}` : `${ORIGIN}/products`,
+          },
+        ],
+      },
+      ...(products && products.length > 0
+        ? [
+            {
+              "@context": "https://schema.org",
+              "@type": "ItemList",
+              numberOfItems: products.length,
+              itemListElement: products.slice(0, 30).map((p, i) => ({
+                "@type": "ListItem",
+                position: i + 1,
+                url: `${ORIGIN}/products/${p.id}`,
+                name: p.name,
+              })),
+            },
+          ]
+        : []),
+    ],
   });
 
   const maxPrice = PRICE_RANGES.find(r => r.value === priceRange)?.max;
