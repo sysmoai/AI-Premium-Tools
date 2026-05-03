@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useCreateCustomer, useCreateOrder } from "@workspace/api-client-react";
 import type { CartItem } from "@/hooks/use-cart";
 import { BKASH_NUMBER, NAGAD_NUMBER, BANK_INFO } from "@/config/contact";
+import { useSeo } from "@/hooks/use-seo";
 
 interface CheckoutProps {
   items: CartItem[];
@@ -73,6 +74,12 @@ export default function Checkout({ items, total, onClearCart }: CheckoutProps) {
   const createOrder = useCreateOrder();
 
   const currentPm = PAYMENT_METHODS.find(p => p.id === paymentMethod)!;
+
+  useSeo({
+    title: "Checkout — AIPT",
+    description: "Complete your AI subscription order. Pay securely via bKash, Nagad, or bank transfer.",
+    type: "website",
+  });
 
   if (items.length === 0) {
     return (

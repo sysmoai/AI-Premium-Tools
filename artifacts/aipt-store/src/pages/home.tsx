@@ -8,6 +8,7 @@ import { useListProducts, useListCategories, useGetDashboardStats } from "@works
 import { useInView } from "@/hooks/use-in-view";
 import { WHATSAPP_URL } from "@/config/contact";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
+import { useSeo } from "@/hooks/use-seo";
 
 interface HomeProps {
   onAddToCart: (product: { productId: number; name: string; price_bdt: number; image_url?: string; duration_days?: number }) => void;
@@ -49,6 +50,22 @@ export default function Home({ onAddToCart }: HomeProps) {
   const studentPackagesHref = studentPackagesCat ? `/products?category_id=${studentPackagesCat.id}` : "/products";
   const totalToolsCount = stats?.total_products ?? 71;
   const totalCustomersClaim = "1000+";
+
+  useSeo({
+    title: "AIPT — Affordable AI Subscriptions in Bangladesh | ChatGPT, Claude, Midjourney",
+    description: `Bangladesh's #1 store for premium AI subscriptions. ${totalToolsCount}+ tools including ChatGPT, Claude, Midjourney, Canva Pro and more. Pay in BDT via bKash, Nagad, or bank — 1-hour activation, 30-day warranty.`,
+    keywords: "AI tools Bangladesh, ChatGPT Bangladesh, Claude Bangladesh, Midjourney Bangladesh, premium AI subscriptions BDT, bKash AI subscription, AIPT",
+    type: "website",
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: "AIPT — AI Premium Tools",
+      url: typeof window !== "undefined" ? window.location.origin : undefined,
+      description: "Bangladesh's most affordable store for premium AI subscriptions.",
+      areaServed: "BD",
+      paymentAccepted: "bKash, Nagad, Rocket, Upay, Bank Transfer",
+    },
+  });
 
   return (
     <div className="min-h-screen">

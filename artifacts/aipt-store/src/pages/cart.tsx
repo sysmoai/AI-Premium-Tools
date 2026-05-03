@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import type { CartItem } from "@/hooks/use-cart";
+import { useSeo } from "@/hooks/use-seo";
 
 interface CartProps {
   items: CartItem[];
@@ -27,6 +28,12 @@ function getProductGradient(name: string): string {
 }
 
 export default function Cart({ items, total, onRemove, onUpdateQuantity }: CartProps) {
+  useSeo({
+    title: items.length > 0 ? `Your Cart (${items.length}) — AIPT` : "Your Cart — AIPT",
+    description: "Review your AI subscription order. Pay securely in BDT via bKash, Nagad, Rocket, Upay, or bank transfer.",
+    type: "website",
+  });
+
   if (items.length === 0) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-24 text-center">

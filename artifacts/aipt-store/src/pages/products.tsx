@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useListProducts, useListCategories } from "@workspace/api-client-react";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
+import { useSeo } from "@/hooks/use-seo";
 
 interface ProductsProps {
   onAddToCart: (product: { productId: number; name: string; price_bdt: number; image_url?: string; duration_days?: number }) => void;
@@ -30,6 +31,20 @@ export default function Products({ onAddToCart }: ProductsProps) {
   const { data: categories } = useListCategories();
   const { data: allProducts } = useListProducts({ is_active: true });
   const totalCount = allProducts?.length ?? 0;
+
+  const activeCat = categories?.find(c => c.id === selectedCategory);
+  useSeo({
+    title: searchQuery
+      ? `Search: ${searchQuery} — AI Tools in Bangladesh`
+      : activeCat
+        ? `${activeCat.name} — AI Tools in Bangladesh`
+        : "All AI Tools — Affordable Premium Subscriptions in Bangladesh",
+    description: activeCat
+      ? `Browse ${activeCat.name} tools at AIPT — Bangladesh's most affordable store for premium AI subscriptions. Pay in BDT via bKash, Nagad or bank.`
+      : `${totalCount}+ premium AI tools at student-friendly prices. ChatGPT, Claude, Midjourney, Canva Pro and more — paid in BDT, activated in 1 hour.`,
+    keywords: "AI tools Bangladesh, premium AI subscriptions, ChatGPT BDT, Claude BDT, Midjourney BDT, bKash AI",
+    type: "website",
+  });
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">

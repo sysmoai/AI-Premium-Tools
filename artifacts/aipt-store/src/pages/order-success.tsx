@@ -5,11 +5,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useGetOrder, getGetOrderQueryKey } from "@workspace/api-client-react";
+import { useSeo } from "@/hooks/use-seo";
 
 export default function OrderSuccess() {
   const { id } = useParams<{ id: string }>();
   const { data: order, isLoading } = useGetOrder(Number(id), {
     query: { enabled: !!id, queryKey: getGetOrderQueryKey(Number(id)) },
+  });
+
+  useSeo({
+    title: id ? `Order #${id} Confirmed — AIPT` : "Order Confirmed — AIPT",
+    description: "Thank you for your order at AIPT. Your AI subscription will be activated within 1 hour.",
+    type: "website",
   });
 
   const STATUS_COLORS: Record<string, string> = {

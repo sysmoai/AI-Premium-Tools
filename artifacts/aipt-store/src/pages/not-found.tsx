@@ -3,7 +3,14 @@ import { Compass, Home, ShoppingBag, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WHATSAPP_URL } from "@/config/contact";
 
+import { useSeo } from "@/hooks/use-seo";
+
 export default function NotFound() {
+  useSeo({
+    title: "Page Not Found — AIPT",
+    description: "The page you're looking for doesn't exist. Browse our AI subscription store instead.",
+    type: "website",
+  });
   return (
     <div className="min-h-[70vh] w-full flex items-center justify-center px-4 py-16">
       <div className="max-w-lg w-full text-center">
