@@ -6,23 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useGetProduct, getGetProductQueryKey } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
 
 interface ProductDetailProps {
   onAddToCart: (product: { productId: number; name: string; price_bdt: number; image_url?: string; duration_days?: number }) => void;
-}
-
-function getProductGradient(name: string): string {
-  const gradients = [
-    "from-violet-500 to-purple-600",
-    "from-blue-500 to-indigo-600",
-    "from-pink-500 to-rose-600",
-    "from-green-500 to-emerald-600",
-    "from-orange-500 to-amber-600",
-    "from-cyan-500 to-blue-600",
-  ];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash + name.charCodeAt(i)) % gradients.length;
-  return gradients[hash];
 }
 
 const HOW_IT_WORKS = [
@@ -84,7 +71,6 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
     : 0;
 
   const gradient = getProductGradient(product.name);
-  const initial = product.name.charAt(0).toUpperCase();
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
@@ -98,26 +84,15 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
         {/* Left column: Info */}
         <div>
           {/* Tool logo area */}
-          <div className={`relative h-40 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center mb-8 overflow-hidden shadow-xl`}>
-            <span className="text-9xl font-black text-white/20 select-none absolute" style={{ fontFamily: "Outfit, sans-serif" }}>
-              {initial}
-            </span>
-            <span className="text-7xl font-black text-white relative z-10 drop-shadow-xl" style={{ fontFamily: "Outfit, sans-serif" }}>
-              {initial}
-            </span>
-            <div className="absolute bottom-3 right-3 flex gap-1.5">
-              {product.is_featured && (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-white/20 text-white border border-white/30 backdrop-blur-sm">
-                  ⭐ Featured
-                </span>
-              )}
-              {savings > 0 && (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-500/80 text-white">
-                  Save {savings}%
-                </span>
-              )}
-            </div>
-          </div>
+          <ProductLogoBanner
+            name={product.name}
+            imageUrl={product.image_url}
+            gradient={gradient}
+            size="detail"
+            isFeatured={product.is_featured ?? false}
+            savingsPct={savings}
+            className="mb-8 shadow-xl"
+          />
 
           <div className="flex flex-wrap gap-2 mb-4">
             <Badge variant="outline">{product.category_name}</Badge>

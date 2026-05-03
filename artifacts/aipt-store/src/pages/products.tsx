@@ -7,23 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useListProducts, useListCategories } from "@workspace/api-client-react";
+import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
 
 interface ProductsProps {
   onAddToCart: (product: { productId: number; name: string; price_bdt: number; image_url?: string; duration_days?: number }) => void;
-}
-
-function getProductGradient(name: string): string {
-  const gradients = [
-    "from-violet-500 to-purple-600",
-    "from-blue-500 to-indigo-600",
-    "from-pink-500 to-rose-600",
-    "from-green-500 to-emerald-600",
-    "from-orange-500 to-amber-600",
-    "from-cyan-500 to-blue-600",
-  ];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash + name.charCodeAt(i)) % gradients.length;
-  return gradients[hash];
 }
 
 export default function Products({ onAddToCart }: ProductsProps) {
@@ -123,7 +110,6 @@ export default function Products({ onAddToCart }: ProductsProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {products?.map(product => {
             const gradient = getProductGradient(product.name);
-            const initial = product.name.charAt(0).toUpperCase();
             const savingsPct = product.original_price_bdt
               ? Math.round((1 - product.price_bdt / product.original_price_bdt) * 100)
               : 0;
@@ -133,27 +119,14 @@ export default function Products({ onAddToCart }: ProductsProps) {
                 className="group hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 overflow-hidden"
                 data-testid={`card-product-${product.id}`}
               >
-                {/* Top gradient banner with tool initial */}
-                <div className={`relative h-20 bg-gradient-to-br ${gradient} flex items-center justify-center overflow-hidden`}>
-                  <span className="text-5xl font-black text-white/25 select-none absolute" style={{ fontFamily: "Outfit, sans-serif" }}>
-                    {initial}
-                  </span>
-                  <span className="text-4xl font-black text-white relative z-10 drop-shadow-md" style={{ fontFamily: "Outfit, sans-serif" }}>
-                    {initial}
-                  </span>
-                  <div className="absolute top-2 left-2 flex flex-col gap-1">
-                    {product.is_featured && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-white/20 text-white border border-white/30 backdrop-blur-sm">
-                        ⭐ Featured
-                      </span>
-                    )}
-                    {savingsPct > 0 && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500/80 text-white">
-                        Save {savingsPct}%
-                      </span>
-                    )}
-                  </div>
-                </div>
+                <ProductLogoBanner
+                  name={product.name}
+                  imageUrl={product.image_url}
+                  gradient={gradient}
+                  size="card"
+                  isFeatured={product.is_featured ?? false}
+                  savingsPct={savingsPct}
+                />
 
                 <CardContent className="p-5">
                   <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors mb-1.5">

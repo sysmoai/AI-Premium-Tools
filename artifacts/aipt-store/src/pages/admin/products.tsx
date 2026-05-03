@@ -23,11 +23,12 @@ interface ProductForm {
   is_featured: boolean;
   is_active: boolean;
   features: string;
+  image_url: string;
 }
 
 const emptyForm: ProductForm = {
   name: "", description: "", price_bdt: "", original_price_bdt: "",
-  category_id: "", duration_days: "30", is_featured: false, is_active: true, features: "",
+  category_id: "", duration_days: "30", is_featured: false, is_active: true, features: "", image_url: "",
 };
 
 export default function AdminProducts() {
@@ -61,6 +62,7 @@ export default function AdminProducts() {
       is_featured: product.is_featured || false,
       is_active: product.is_active !== false,
       features: (product.features || []).join("\n"),
+      image_url: product.image_url || "",
     });
     setShowDialog(true);
   }
@@ -81,6 +83,7 @@ export default function AdminProducts() {
       is_featured: form.is_featured,
       is_active: form.is_active,
       features: form.features ? form.features.split("\n").map(f => f.trim()).filter(Boolean) : undefined,
+      image_url: form.image_url,
     };
     try {
       if (editId) {
@@ -199,6 +202,27 @@ export default function AdminProducts() {
             <div className="space-y-1.5">
               <Label>Description</Label>
               <Input value={form.description} onChange={e => updateForm("description", e.target.value)} data-testid="input-product-desc" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Logo / Image URL</Label>
+              <div className="flex gap-2 items-center">
+                <Input
+                  value={form.image_url}
+                  onChange={e => updateForm("image_url", e.target.value)}
+                  placeholder="https://logo.clearbit.com/openai.com"
+                  data-testid="input-product-image-url"
+                />
+                {form.image_url && (
+                  <img
+                    key={form.image_url}
+                    src={form.image_url}
+                    alt="preview"
+                    className="h-10 w-10 rounded object-contain border border-border bg-white shrink-0"
+                    onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                  />
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">Paste a direct image URL or use clearbit: https://logo.clearbit.com/domain.com</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
