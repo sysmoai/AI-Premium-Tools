@@ -27,12 +27,16 @@ export default function Products({ onAddToCart }: ProductsProps) {
     search: searchQuery || undefined,
   });
   const { data: categories } = useListCategories();
+  const { data: allProducts } = useListProducts({ is_active: true });
+  const totalCount = allProducts?.length ?? 0;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
       <div className="mb-8">
         <h1 className="text-4xl font-bold mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>All AI Tools</h1>
-        <p className="text-muted-foreground">29+ premium AI tools at student-friendly prices</p>
+        <p className="text-muted-foreground">
+          {totalCount > 0 ? `${totalCount}+ premium AI tools at student-friendly prices` : "Premium AI tools at student-friendly prices"}
+        </p>
       </div>
 
       {/* Sticky filter bar */}
