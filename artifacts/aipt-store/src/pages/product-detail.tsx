@@ -41,6 +41,7 @@ import { useSeo } from "@/hooks/use-seo";
 import { useRecentlyViewed } from "@/hooks/use-recently-viewed";
 import { getProductRating, getProductReviewCount } from "@/hooks/use-product-rating";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
+import { CustomerReviews } from "@/components/customer-reviews";
 import { WHATSAPP_URL } from "@/config/contact";
 
 interface ProductDetailProps {
@@ -110,7 +111,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { track: trackViewed } = useRecentlyViewed();
+  const { ids: recentIds, track: trackViewed } = useRecentlyViewed();
   const productId = Number(id);
 
   const { data: product, isLoading } = useGetProduct(productId, {
@@ -123,6 +124,11 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
       enabled: !!product?.category_id,
       queryKey: getListProductsQueryKey(relatedParams),
     },
+  });
+
+  const allProductsParams = { is_active: true };
+  const { data: allProducts } = useListProducts(allProductsParams, {
+    query: { queryKey: getListProductsQueryKey(allProductsParams) },
   });
 
   // Scroll to top when route changes
@@ -278,6 +284,11 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
   const inStock = product.stock_count === undefined || (product.stock_count ?? 1) > 0;
 
   const related = (relatedAll ?? []).filter(p => p.id !== product.id).slice(0, 4);
+  const recentlyViewedList = recentIds
+    .filter(rid => rid !== product.id)
+    .map(rid => (allProducts ?? []).find(p => p.id === rid))
+    .filter((p): p is NonNullable<typeof p> => Boolean(p))
+    .slice(0, 4);
 
   return (
     <>
@@ -375,10 +386,14 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
 
             {/* Tabs: Overview / Included / Delivery / FAQ */}
             <Tabs defaultValue="included" className="w-full">
-              <TabsList className="grid w-full grid-cols-4 mb-5">
+              <TabsList className="grid w-full grid-cols-5 mb-5">
                 <TabsTrigger value="included" data-testid="tab-included">
                   <Check className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
                   Included
+                </TabsTrigger>
+                <TabsTrigger value="reviews" data-testid="tab-reviews">
+                  <Star className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
+                  Reviews
                 </TabsTrigger>
                 <TabsTrigger value="delivery" data-testid="tab-delivery">
                   <Truck className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
@@ -406,6 +421,10 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
                     </div>
                   ))}
                 </div>
+              </TabsContent>
+
+              <TabsContent value="reviews" className="mt-0">
+                <CustomerReviews productId={product.id} productName={product.name} />
               </TabsContent>
 
               <TabsContent value="delivery" className="mt-0">
@@ -620,6 +639,41 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
                               ৳{p.original_price_bdt.toLocaleString("en-BD")}
                             </div>
                           )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* Recently viewed strip (excluding current product) */}
+        {recentlyViewedList.length > 0 && (
+          <section className="mt-16" data-testid="section-pdp-recently-viewed">
+            <h2 className="text-2xl font-black mb-6" style={{ fontFamily: "Outfit, sans-serif" }}>
+              Recently viewed
+            </h2>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {recentlyViewedList.map(p => {
+                const grad = getProductGradient(p.name);
+                const sav = p.original_price_bdt ? Math.round((1 - p.price_bdt / p.original_price_bdt) * 100) : 0;
+                return (
+                  <Link key={p.id} href={`/products/${p.id}`}>
+                    <Card className="overflow-hidden h-full hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer" data-testid={`pdp-recent-${p.id}`}>
+                      <ProductLogoBanner
+                        name={p.name}
+                        imageUrl={p.image_url}
+                        gradient={grad}
+                        size="card"
+                        isFeatured={p.is_featured ?? false}
+                        savingsPct={sav}
+                      />
+                      <CardContent className="p-4">
+                        <div className="font-bold text-sm line-clamp-1 mb-1">{p.name}</div>
+                        <div className="font-black text-primary" style={{ fontFamily: "Outfit, sans-serif" }}>
+                          ৳{p.price_bdt.toLocaleString("en-BD")}
                         </div>
                       </CardContent>
                     </Card>

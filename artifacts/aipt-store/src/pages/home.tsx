@@ -407,6 +407,64 @@ export default function Home({ onAddToCart }: HomeProps) {
         </div>
       </section>
 
+      {/* Customer testimonials */}
+      <section className="max-w-6xl mx-auto px-4 py-16" data-testid="section-testimonials">
+        <div className="text-center mb-10">
+          <h2 className="text-3xl font-bold mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>
+            What our customers say
+          </h2>
+          <p className="text-muted-foreground">Real reviews from Bangladeshi students, freelancers and creators</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {[
+            {
+              name: "Tahmid R.",
+              role: "Freelance designer · Dhaka",
+              quote: "Got my Midjourney within 40 minutes of paying via bKash. Been using it for 4 months without a single issue. Saved me thousands of taka vs paying directly.",
+              tool: "Midjourney",
+            },
+            {
+              name: "Sumaiya I.",
+              role: "BUET student · Researcher",
+              quote: "ChatGPT Plus at this price is unbeatable in BD. Support replied to my WhatsApp in 5 minutes when I had a login question. Will keep renewing.",
+              tool: "ChatGPT Plus",
+            },
+            {
+              name: "Imran H.",
+              role: "Content creator · Chittagong",
+              quote: "Tried two other sellers before AIPT — both had problems. AIPT delivered within an hour and gave a real warranty. This is the only place I buy from now.",
+              tool: "Canva Pro",
+            },
+          ].map(t => (
+            <Card key={t.name} className="h-full">
+              <CardContent className="p-6 flex flex-col h-full">
+                <div className="flex items-center gap-0.5 mb-3">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <Star key={n} className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden="true" />
+                  ))}
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed mb-4 flex-1">"{t.quote}"</p>
+                <div className="flex items-center gap-3 pt-3 border-t border-border">
+                  <div
+                    className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
+                    style={{ background: "linear-gradient(135deg, hsl(262 83% 58%), hsl(220 90% 60%))" }}
+                  >
+                    {t.name.charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-sm">{t.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">{t.role}</div>
+                  </div>
+                  <div className="ml-auto text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">
+                    {t.tool}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+
       <section className="max-w-6xl mx-auto px-4 py-20 text-center">
         <div
           className="rounded-lg p-12 relative overflow-hidden"

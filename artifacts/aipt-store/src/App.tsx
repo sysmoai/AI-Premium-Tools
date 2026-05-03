@@ -13,6 +13,8 @@ import Cart from "@/pages/cart";
 import Checkout from "@/pages/checkout";
 import OrderSuccess from "@/pages/order-success";
 import TrackOrder from "@/pages/track-order";
+import Faq from "@/pages/faq";
+import { ErrorBoundary } from "@/components/error-boundary";
 import AdminLogin from "@/pages/admin/login";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminOrders from "@/pages/admin/orders";
@@ -53,6 +55,7 @@ function AppInner() {
     <div className="min-h-screen flex flex-col">
       {!isAdminRoute && <Navbar cartCount={count} />}
       <div className="flex-1">
+        <ErrorBoundary>
         <Switch>
           {/* Store routes */}
           <Route path="/" component={() => <Home onAddToCart={handleAddToCart} />} />
@@ -62,6 +65,7 @@ function AppInner() {
           <Route path="/checkout" component={() => <Checkout items={items} total={total} onClearCart={clearCart} />} />
           <Route path="/order-success/:id" component={OrderSuccess} />
           <Route path="/track-order" component={TrackOrder} />
+          <Route path="/faq" component={Faq} />
 
           {/* Admin routes */}
           <Route path="/admin">
@@ -79,6 +83,7 @@ function AppInner() {
 
           <Route component={NotFound} />
         </Switch>
+        </ErrorBoundary>
       </div>
       {!isAdminRoute && <Footer />}
     </div>

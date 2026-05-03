@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { WHATSAPP_URL } from "@/config/contact";
-import { useListCategories } from "@workspace/api-client-react";
+import { useListCategories, useListProducts } from "@workspace/api-client-react";
 
 interface NavbarProps {
   cartCount: number;
@@ -41,10 +41,19 @@ export default function Navbar({ cartCount }: NavbarProps) {
   const [searchValue, setSearchValue] = useState("");
   const [catsOpen, setCatsOpen] = useState(false);
   const [annIdx, setAnnIdx] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(false);
   const prevCount = useRef(cartCount);
   const catsRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLFormElement>(null);
 
   const { data: categories } = useListCategories();
+  const { data: allProducts } = useListProducts({ is_active: true });
+  const trimmedSearch = searchValue.trim().toLowerCase();
+  const searchResults = trimmedSearch.length >= 2
+    ? (allProducts ?? [])
+        .filter(p => p.name.toLowerCase().includes(trimmedSearch) || (p.description ?? "").toLowerCase().includes(trimmedSearch))
+        .slice(0, 6)
+    : [];
 
   function toggleDark() {
     const next = !dark;
@@ -91,6 +100,20 @@ export default function Navbar({ cartCount }: NavbarProps) {
     }
     return undefined;
   }, [catsOpen]);
+
+  // Close search autocomplete on outside click
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
+    }
+    if (searchOpen) {
+      document.addEventListener("mousedown", onClick);
+      return () => document.removeEventListener("mousedown", onClick);
+    }
+    return undefined;
+  }, [searchOpen]);
 
   const isActive = (path: string) => location === path;
 
@@ -209,16 +232,67 @@ export default function Navbar({ cartCount }: NavbarProps) {
           </nav>
 
           {/* Search bar (desktop) */}
-          <form onSubmit={submitSearch} className="hidden md:flex flex-1 max-w-md relative">
+          <form ref={searchRef} onSubmit={submitSearch} className="hidden md:flex flex-1 max-w-md relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
               type="search"
               value={searchValue}
-              onChange={e => setSearchValue(e.target.value)}
+              onChange={e => { setSearchValue(e.target.value); setSearchOpen(true); }}
+              onFocus={() => setSearchOpen(true)}
               placeholder="Search ChatGPT, Claude, Midjourney…"
               className="pl-9 h-10 rounded-full bg-muted/50 border-muted focus-visible:bg-background"
               data-testid="input-navbar-search"
             />
+            {searchOpen && trimmedSearch.length >= 2 && (
+              <div
+                className="absolute top-full left-0 right-0 mt-2 bg-background border border-border rounded-xl shadow-2xl py-1.5 z-50 max-h-96 overflow-y-auto"
+                style={{ boxShadow: "0 10px 40px hsl(var(--primary) / 0.18)" }}
+                data-testid="menu-search-results"
+              >
+                {searchResults.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                    No tools found for "<span className="font-medium">{searchValue}</span>".
+                    <button
+                      type="submit"
+                      className="block mx-auto mt-2 text-primary text-xs font-semibold hover:underline"
+                    >
+                      Search all products →
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {searchResults.map(p => (
+                      <button
+                        type="button"
+                        key={p.id}
+                        onClick={() => { setSearchOpen(false); setSearchValue(""); navigate(`/products/${p.id}`); }}
+                        className="w-full flex items-center gap-3 px-3 py-2 hover:bg-muted text-left transition-colors"
+                        data-testid={`search-result-${p.id}`}
+                      >
+                        <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+                          {p.image_url ? (
+                            <img src={p.image_url} alt={p.name} loading="lazy" className="h-7 w-7 object-contain" />
+                          ) : (
+                            <span className="text-xs font-bold text-primary">{p.name.charAt(0)}</span>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold truncate">{p.name}</div>
+                          <div className="text-xs text-muted-foreground truncate">{p.category_name}</div>
+                        </div>
+                        <div className="text-sm font-bold text-primary shrink-0">৳{p.price_bdt.toLocaleString("en-BD")}</div>
+                      </button>
+                    ))}
+                    <button
+                      type="submit"
+                      className="block w-full text-center text-xs text-primary font-semibold py-2 border-t border-border hover:bg-muted transition-colors"
+                    >
+                      View all results for "{searchValue}" →
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </form>
 
           {/* Right actions */}

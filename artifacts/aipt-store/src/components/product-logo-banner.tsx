@@ -61,6 +61,8 @@ export function ProductLogoBanner({
           key={imageUrl}
           src={imageUrl}
           alt={name}
+          loading="lazy"
+          decoding="async"
           className={`${logoSize} object-contain ${dropShadow}`}
           onError={() => setImgError(true)}
         />
