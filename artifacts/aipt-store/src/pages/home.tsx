@@ -47,7 +47,7 @@ export default function Home({ onAddToCart }: HomeProps) {
 
   const studentPackagesCat = categories?.find(c => c.slug === "student-packages");
   const studentPackagesHref = studentPackagesCat ? `/products?category_id=${studentPackagesCat.id}` : "/products";
-  const totalToolsCount = stats?.total_products ?? 67;
+  const totalToolsCount = stats?.total_products ?? 71;
   const totalCustomersClaim = "1000+";
 
   return (
