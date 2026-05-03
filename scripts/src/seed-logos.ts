@@ -41,6 +41,10 @@ const LOGO_MAP: Array<{ namePattern: string; imageUrl: string }> = [
   { namePattern: "Otter%", imageUrl: "https://logo.clearbit.com/otter.ai" },
   { namePattern: "Gamma%", imageUrl: "https://logo.clearbit.com/gamma.app" },
   { namePattern: "Writesonic%", imageUrl: "https://logo.clearbit.com/writesonic.com" },
+  { namePattern: "Make.com%", imageUrl: "https://logo.clearbit.com/make.com" },
+  { namePattern: "Zapier%", imageUrl: "https://logo.clearbit.com/zapier.com" },
+  { namePattern: "n8n%", imageUrl: "https://logo.clearbit.com/n8n.io" },
+  { namePattern: "Lindy%", imageUrl: "https://logo.clearbit.com/lindy.ai" },
 ];
 
 async function main() {

@@ -32,7 +32,7 @@ const CATEGORY_GRADIENTS: Record<string, string> = {
 };
 
 const TOOL_CHIPS = [
-  { name: "ChatGPT 4", emoji: "🤖", delay: "animate-float-d1", top: "12%", right: "6%", rotate: "-2deg" },
+  { name: "ChatGPT 5", emoji: "🤖", delay: "animate-float-d1", top: "12%", right: "6%", rotate: "-2deg" },
   { name: "Midjourney", emoji: "🎨", delay: "animate-float-d2 animate-float-reverse", top: "32%", right: "22%", rotate: "2deg" },
   { name: "Canva Pro", emoji: "✏️", delay: "animate-float-d3", top: "54%", right: "4%", rotate: "-1deg" },
   { name: "Claude AI", emoji: "🧠", delay: "animate-float-d4 animate-float-reverse", top: "22%", right: "38%", rotate: "1.5deg" },

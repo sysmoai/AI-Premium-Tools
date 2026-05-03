@@ -51,6 +51,7 @@ async function main() {
   const studentPkg = await getCategoryId("student-packages");
   const freelancerPkg = await getCategoryId("freelancer-packages");
   const aiCode = await getCategoryId("ai-code");
+  const aiAutomation = await getCategoryId("ai-automation");
 
   // Logo helpers
   const L = {
@@ -80,6 +81,10 @@ async function main() {
     otter: "https://logo.clearbit.com/otter.ai",
     gamma: "https://logo.clearbit.com/gamma.app",
     writesonic: "https://logo.clearbit.com/writesonic.com",
+    make: "https://logo.clearbit.com/make.com",
+    zapier: "https://logo.clearbit.com/zapier.com",
+    n8n: "https://logo.clearbit.com/n8n.io",
+    lindy: "https://logo.clearbit.com/lindy.ai",
   };
 
   const products: Seed[] = [
@@ -644,6 +649,39 @@ async function main() {
       categoryId: freelancerPkg, imageUrl: null,
       features: ["ChatGPT Business (Personal)", "Claude Pro (Personal)", "Notion Business", "Adobe Creative Cloud (All Apps)"],
       durationDays: 30, isFeatured: false, isActive: true, stockCount: 10,
+    },
+    // ── AI Automation ─────────────────────────────────────────────────────────
+    {
+      id: 68, name: "Make.com Pro",
+      description: "Visual no-code automation — connect 1,500+ apps and run complex multi-step workflows. Loved by ops teams and freelancers.",
+      originalPriceBdt: "1990", priceBdt: "1290",
+      categoryId: aiAutomation, imageUrl: L.make,
+      features: ["10,000 ops/mo", "1,500+ app integrations", "Unlimited active scenarios", "1-min interval scheduling", "Personal account", "30-day warranty"],
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 25,
+    },
+    {
+      id: 69, name: "Zapier Professional",
+      description: "The industry-standard automation platform — wire ChatGPT, Sheets, Gmail, Slack and 7,000+ apps with zero code.",
+      originalPriceBdt: "2990", priceBdt: "1890",
+      categoryId: aiAutomation, imageUrl: L.zapier,
+      features: ["2,000 tasks/mo", "Unlimited multi-step Zaps", "Premium app integrations", "Webhooks & paths", "Personal account", "30-day warranty"],
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 20,
+    },
+    {
+      id: 70, name: "n8n Cloud Starter",
+      description: "Open-source automation in the cloud — full control, AI nodes, and 400+ integrations at a flat monthly price.",
+      originalPriceBdt: "1490", priceBdt: "899",
+      categoryId: aiAutomation, imageUrl: L.n8n,
+      features: ["2,500 workflow executions/mo", "5 active workflows", "Unlimited steps per workflow", "AI agent nodes", "Personal account", "30-day warranty"],
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 25,
+    },
+    {
+      id: 71, name: "Lindy AI Personal",
+      description: "Build AI employees in minutes — agents that handle email, CRM, scheduling, and outreach autonomously.",
+      originalPriceBdt: "3490", priceBdt: "2290",
+      categoryId: aiAutomation, imageUrl: L.lindy,
+      features: ["400 credits/mo", "Unlimited Lindies (agents)", "Email, CRM, calendar tools", "Multi-step workflows", "Personal account", "30-day warranty"],
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 15,
     },
     {
       id: 67, name: "B2B Implementation Package",
