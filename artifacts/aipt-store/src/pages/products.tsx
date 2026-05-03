@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useSearch } from "wouter";
 import { Link } from "wouter";
-import { Search, SlidersHorizontal, Star, Zap } from "lucide-react";
+import { Search, SlidersHorizontal, Zap, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,13 +17,12 @@ import {
 import { useListProducts, useListCategories } from "@workspace/api-client-react";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
 import { useSeo } from "@/hooks/use-seo";
-import { getProductRating, getProductReviewCount } from "@/hooks/use-product-rating";
 
 interface ProductsProps {
   onAddToCart: (product: { productId: number; name: string; price_bdt: number; image_url?: string; duration_days?: number }) => void;
 }
 
-type SortKey = "popular" | "featured" | "price-asc" | "price-desc" | "newest" | "rating";
+type SortKey = "popular" | "featured" | "price-asc" | "price-desc" | "newest";
 
 const PRICE_RANGES = [
   { label: "Any price", value: "any", max: undefined as number | undefined },
@@ -123,9 +122,6 @@ export default function Products({ onAddToCart }: ProductsProps) {
       case "newest":
         list.sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime());
         break;
-      case "rating":
-        list.sort((a, b) => getProductRating(b.id) - getProductRating(a.id));
-        break;
       case "featured":
         list.sort((a, b) => Number(b.is_featured ?? false) - Number(a.is_featured ?? false));
         break;
@@ -179,7 +175,6 @@ export default function Products({ onAddToCart }: ProductsProps) {
                 <SelectContent>
                   <SelectItem value="popular">Most Popular</SelectItem>
                   <SelectItem value="featured">Featured first</SelectItem>
-                  <SelectItem value="rating">Top Rated</SelectItem>
                   <SelectItem value="price-asc">Price: Low to High</SelectItem>
                   <SelectItem value="price-desc">Price: High to Low</SelectItem>
                   <SelectItem value="newest">Newest</SelectItem>
@@ -263,8 +258,6 @@ export default function Products({ onAddToCart }: ProductsProps) {
             const savingsPct = product.original_price_bdt
               ? Math.round((1 - product.price_bdt / product.original_price_bdt) * 100)
               : 0;
-            const rating = getProductRating(product.id);
-            const reviews = getProductReviewCount(product.id);
             return (
               <Card
                 key={product.id}
@@ -291,21 +284,13 @@ export default function Products({ onAddToCart }: ProductsProps) {
                     </h3>
                   </Link>
 
-                  {/* Rating row */}
-                  <div className="flex items-center gap-1.5 mb-2 text-xs">
-                    <div className="flex items-center gap-0.5">
-                      {[1, 2, 3, 4, 5].map(n => (
-                        <Star
-                          key={n}
-                          aria-hidden="true"
-                          className={`h-3 w-3 ${n <= Math.round(rating) ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"}`}
-                        />
-                      ))}
-                    </div>
-                    <span className="font-semibold">{rating}</span>
-                    <span className="text-muted-foreground">({reviews})</span>
+                  {/* Trust row — replaces the previous synthetic rating display */}
+                  <div className="flex items-center gap-2 mb-2 text-xs">
+                    <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-medium">
+                      <ShieldCheck className="h-3 w-3" /> 30-day warranty
+                    </span>
                     <span className="ml-auto inline-flex items-center gap-0.5 text-green-600 font-medium">
-                      <Zap className="h-3 w-3" /> 1-hr
+                      <Zap className="h-3 w-3" /> 1-hr activation
                     </span>
                   </div>
 

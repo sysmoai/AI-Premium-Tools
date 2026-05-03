@@ -35,11 +35,12 @@ import {
   getGetProductQueryKey,
   useListProducts,
   getListProductsQueryKey,
+  useListProductReviews,
+  getListProductReviewsQueryKey,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSeo } from "@/hooks/use-seo";
 import { useRecentlyViewed } from "@/hooks/use-recently-viewed";
-import { getProductRating, getProductReviewCount } from "@/hooks/use-product-rating";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
 import { CustomerReviews } from "@/components/customer-reviews";
 import { WHATSAPP_URL } from "@/config/contact";
@@ -141,8 +142,19 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
     if (product?.id) trackViewed(product.id);
   }, [product?.id, trackViewed]);
 
-  const rating = useMemo(() => (product ? getProductRating(product.id) : 0), [product]);
-  const reviewCount = useMemo(() => (product ? getProductReviewCount(product.id) : 0), [product]);
+  const reviewsProductId = product?.id ?? 0;
+  const { data: realReviews } = useListProductReviews(reviewsProductId, {
+    query: {
+      enabled: !!product?.id,
+      queryKey: getListProductReviewsQueryKey(reviewsProductId),
+    },
+  });
+  const reviewCount = realReviews?.length ?? 0;
+  const rating = useMemo(() => {
+    if (!realReviews || realReviews.length === 0) return 0;
+    const sum = realReviews.reduce((acc, r) => acc + r.rating, 0);
+    return Math.round((sum / realReviews.length) * 10) / 10;
+  }, [realReviews]);
 
   // ─── SEO: per-product meta + Google-2024-compliant Product / Breadcrumb / FAQ JSON-LD ───
   const ORIGIN =
@@ -230,13 +242,30 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
               },
             },
           },
-          aggregateRating: {
-            "@type": "AggregateRating",
-            ratingValue: rating,
-            reviewCount,
-            bestRating: 5,
-            worstRating: 1,
-          },
+          ...(reviewCount > 0
+            ? {
+                aggregateRating: {
+                  "@type": "AggregateRating",
+                  ratingValue: rating,
+                  reviewCount,
+                  bestRating: 5,
+                  worstRating: 1,
+                },
+                review: (realReviews ?? []).slice(0, 10).map(r => ({
+                  "@type": "Review",
+                  author: { "@type": "Person", name: r.customer_name },
+                  datePublished: r.created_at,
+                  reviewRating: {
+                    "@type": "Rating",
+                    ratingValue: r.rating,
+                    bestRating: 5,
+                    worstRating: 1,
+                  },
+                  reviewBody: r.body,
+                  ...(r.title ? { name: r.title } : {}),
+                })),
+              }
+            : {}),
           additionalProperty: [
             { "@type": "PropertyValue", name: "Subscription duration", value: `${durationDaysSeo} days` },
             { "@type": "PropertyValue", name: "Delivery method", value: "WhatsApp" },
@@ -432,21 +461,31 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
               {product.name}
             </h1>
 
-            {/* Rating */}
+            {/* Rating row — only shown when real reviews exist */}
             <div className="flex items-center gap-3 mb-5 text-sm">
-              <div className="flex items-center gap-0.5" aria-label={`${rating} out of 5 stars`}>
-                {[1, 2, 3, 4, 5].map(n => (
-                  <Star
-                    key={n}
-                    aria-hidden="true"
-                    className={`h-4 w-4 ${n <= Math.round(rating) ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"}`}
-                  />
-                ))}
-                <span className="font-bold ml-1.5" data-testid="text-rating">{rating}</span>
-              </div>
-              <span className="text-muted-foreground">·</span>
-              <span className="text-muted-foreground" data-testid="text-review-count">{reviewCount} verified buyers</span>
-              <span className="text-muted-foreground hidden sm:inline">·</span>
+              {reviewCount > 0 ? (
+                <>
+                  <div className="flex items-center gap-0.5" aria-label={`${rating} out of 5 stars`}>
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <Star
+                        key={n}
+                        aria-hidden="true"
+                        className={`h-4 w-4 ${n <= Math.round(rating) ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"}`}
+                      />
+                    ))}
+                    <span className="font-bold ml-1.5" data-testid="text-rating">{rating.toFixed(1)}</span>
+                  </div>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="text-muted-foreground" data-testid="text-review-count">
+                    {reviewCount} verified review{reviewCount === 1 ? "" : "s"}
+                  </span>
+                </>
+              ) : (
+                <span className="text-muted-foreground" data-testid="text-no-reviews">
+                  No reviews yet — be the first to review after your order
+                </span>
+              )}
+              <span className="text-muted-foreground hidden sm:inline ml-auto">·</span>
               <button onClick={handleShare} className="hidden sm:inline-flex items-center gap-1 text-primary hover:underline" data-testid="btn-share">
                 <Share2 className="h-3.5 w-3.5" /> Share
               </button>

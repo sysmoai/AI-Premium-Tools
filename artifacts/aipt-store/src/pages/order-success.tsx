@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useGetOrder, getGetOrderQueryKey } from "@workspace/api-client-react";
 import { useSeo } from "@/hooks/use-seo";
+import { LeaveReviewForm } from "@/components/leave-review-form";
 
 function readStashedPhone(id: string | undefined): string | undefined {
   if (!id) return undefined;
@@ -171,6 +172,32 @@ export default function OrderSuccess() {
           ))}
         </div>
       </div>
+
+      {/* Verified-buyer review prompts — one per unique product in the order */}
+      {order && order.items && order.items.length > 0 && (
+        <div className="text-left mb-10">
+          <h3 className="font-bold text-xl mb-2 text-center">Got your access? Review what you bought</h3>
+          <p className="text-sm text-muted-foreground text-center mb-5">
+            Honest reviews from real buyers help other Bangladeshi shoppers decide. We moderate within 24 hours.
+          </p>
+          <div className="space-y-4">
+            {Array.from(
+              new Map(
+                order.items.map(item => [item.product_id, { product_id: item.product_id, product_name: item.product_name ?? `Product #${item.product_id}` }]),
+              ).values(),
+            ).map(p => (
+              <LeaveReviewForm
+                key={p.product_id}
+                orderId={order.id}
+                customerPhone={order.customer_phone ?? phone}
+                customerName={order.customer_name}
+                productId={p.product_id}
+                productName={p.product_name}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-4 justify-center">
         <Link href="/products">

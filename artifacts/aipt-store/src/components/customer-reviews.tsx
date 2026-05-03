@@ -1,159 +1,130 @@
-import { useState } from "react";
-import { Star, ThumbsUp, CheckCircle2, ChevronDown } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Star, CheckCircle2, ChevronDown, MessageSquareHeart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { getProductRating, getProductReviewCount } from "@/hooks/use-product-rating";
+import { useListProductReviews } from "@workspace/api-client-react";
 
-const FIRST_NAMES = [
-  "Rakib", "Tahmid", "Sumaiya", "Nabila", "Imran", "Sadia", "Tanvir", "Rifat", "Mahir", "Faria",
-  "Adib", "Nusrat", "Shihab", "Tania", "Akash", "Mehedi", "Lamia", "Nahid", "Sakib", "Tasnim",
-  "Hasib", "Mahmuda", "Rakin", "Tasfia", "Anika", "Saif", "Naeem", "Promi", "Rumana", "Zahid",
-];
-const LAST_INITIALS = ["K.", "H.", "R.", "I.", "S.", "M.", "A.", "C.", "B.", "P."];
-
-const REVIEW_TEMPLATES = [
-  { stars: 5, title: "Working perfectly!", body: "Got my access within 30 minutes of paying via bKash. Been using it daily for {use}. Best price I found in BD." },
-  { stars: 5, title: "Worth every taka", body: "Was sceptical at first but the team was super responsive on WhatsApp. Account works exactly as advertised. Will buy again." },
-  { stars: 5, title: "Saved me a lot of money", body: "Compared to paying in USD this is way cheaper. Activation was within an hour. Customer support replies fast." },
-  { stars: 5, title: "Smooth experience", body: "Ordered late at night, got delivery early morning. Zero issues so far. Recommended for {use}." },
-  { stars: 4, title: "Good service overall", body: "Took a bit longer than expected (around 2 hours) but the account works fine. Support was helpful when I asked questions." },
-  { stars: 5, title: "Reliable seller", body: "Second time ordering from AIPT. Always reliable. Login worked on first try, no issues with account sharing." },
-  { stars: 5, title: "Best in Bangladesh", body: "Tried other sellers before but AIPT is by far the most trustworthy. Warranty replacement was hassle-free." },
-  { stars: 4, title: "Great value", body: "Account works great for my {use} needs. Only minor issue was waiting for confirmation, but it came through within an hour." },
-  { stars: 5, title: "Highly recommend", body: "Easy bKash payment, instant WhatsApp updates, working account. Couldn't ask for more at this price." },
-  { stars: 5, title: "Amazing support", body: "Had a small issue logging in, messaged on WhatsApp and they fixed it in 5 minutes. Excellent support team." },
-];
-
-const USE_CASES = ["my freelance work", "university projects", "content creation", "study", "client projects", "personal projects"];
-
-function pickReviews(productId: number, count: number) {
-  const out: Array<{ name: string; date: string; stars: number; title: string; body: string; verified: boolean; helpful: number }> = [];
-  for (let i = 0; i < count; i++) {
-    const seed = (productId * 31 + i * 17) >>> 0;
-    const tmpl = REVIEW_TEMPLATES[seed % REVIEW_TEMPLATES.length];
-    const first = FIRST_NAMES[(seed >>> 3) % FIRST_NAMES.length];
-    const last = LAST_INITIALS[(seed >>> 5) % LAST_INITIALS.length];
-    const useIdx = (seed >>> 7) % USE_CASES.length;
-    const daysAgo = 2 + ((seed >>> 9) % 95);
-    const date = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
-    const helpful = 1 + ((seed >>> 11) % 28);
-    out.push({
-      name: `${first} ${last}`,
-      date: date.toLocaleDateString("en-BD", { year: "numeric", month: "short", day: "numeric" }),
-      stars: tmpl.stars,
-      title: tmpl.title,
-      body: tmpl.body.replace("{use}", USE_CASES[useIdx]),
-      verified: true,
-      helpful,
-    });
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString("en-BD", { year: "numeric", month: "short", day: "numeric" });
+  } catch {
+    return "";
   }
-  return out;
 }
 
 export function CustomerReviews({ productId, productName }: { productId: number; productName: string }) {
   const [showAll, setShowAll] = useState(false);
-  const totalReviews = getProductReviewCount(productId);
-  const avgRating = getProductRating(productId);
-  const reviews = pickReviews(productId, showAll ? 8 : 4);
+  const { data: reviews, isLoading } = useListProductReviews(productId);
 
-  // Synthetic distribution: heavy on 5★
-  const dist = [
-    { stars: 5, pct: 78 },
-    { stars: 4, pct: 17 },
-    { stars: 3, pct: 3 },
-    { stars: 2, pct: 1 },
-    { stars: 1, pct: 1 },
-  ];
+  const sorted = useMemo(() => {
+    if (!reviews) return [];
+    return [...reviews].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [reviews]);
+
+  const totalReviews = sorted.length;
+  const avgRating = useMemo(() => {
+    if (totalReviews === 0) return 0;
+    const sum = sorted.reduce((acc, r) => acc + r.rating, 0);
+    return Math.round((sum / totalReviews) * 10) / 10;
+  }, [sorted, totalReviews]);
+
+  const dist = useMemo(() => {
+    const buckets = [0, 0, 0, 0, 0];
+    sorted.forEach(r => {
+      const i = Math.max(1, Math.min(5, r.rating)) - 1;
+      buckets[i] += 1;
+    });
+    return buckets;
+  }, [sorted]);
+
+  if (isLoading) {
+    return <div className="text-sm text-muted-foreground py-6">Loading reviews…</div>;
+  }
+
+  if (totalReviews === 0) {
+    return (
+      <div className="rounded-2xl border bg-muted/20 p-8 text-center" data-testid="reviews-empty">
+        <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-3">
+          <MessageSquareHeart className="h-6 w-6 text-primary" />
+        </div>
+        <h3 className="font-bold text-lg mb-1">No reviews yet for {productName}</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Be the first to share your experience after your order is delivered. Verified buyers can leave a review from their order confirmation page.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          We only show real reviews from real customers — no auto-generated ratings.
+        </p>
+      </div>
+    );
+  }
+
+  const visible = showAll ? sorted : sorted.slice(0, 4);
 
   return (
-    <div className="space-y-6" data-testid="customer-reviews">
-      {/* Header with rating breakdown */}
-      <div className="grid md:grid-cols-3 gap-6 items-start">
-        <div className="text-center md:text-left md:border-r md:pr-6">
-          <div className="text-5xl font-black text-primary mb-1" style={{ fontFamily: "Outfit, sans-serif" }}>
-            {avgRating}
-          </div>
-          <div className="flex items-center gap-0.5 justify-center md:justify-start mb-1">
+    <div data-testid="reviews-list">
+      {/* Summary */}
+      <div className="grid sm:grid-cols-[auto_1fr] gap-6 mb-6">
+        <div className="text-center">
+          <div className="text-5xl font-black" data-testid="text-avg-rating">{avgRating.toFixed(1)}</div>
+          <div className="flex items-center justify-center gap-0.5 my-1" aria-label={`${avgRating} out of 5`}>
             {[1, 2, 3, 4, 5].map(n => (
-              <Star
-                key={n}
-                aria-hidden="true"
-                className={`h-4 w-4 ${n <= Math.round(avgRating) ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"}`}
-              />
+              <Star key={n} aria-hidden="true" className={`h-4 w-4 ${n <= Math.round(avgRating) ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"}`} />
             ))}
           </div>
-          <div className="text-xs text-muted-foreground">Based on {totalReviews} reviews</div>
+          <div className="text-xs text-muted-foreground" data-testid="text-total-reviews">{totalReviews} review{totalReviews === 1 ? "" : "s"}</div>
         </div>
-        <div className="md:col-span-2 space-y-1.5">
-          {dist.map(d => (
-            <div key={d.stars} className="flex items-center gap-2 text-xs">
-              <span className="w-12 text-muted-foreground">{d.stars} star</span>
-              <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-                <div className="h-full bg-amber-400 rounded-full" style={{ width: `${d.pct}%` }} />
+        <div className="space-y-1.5">
+          {[5, 4, 3, 2, 1].map(stars => {
+            const count = dist[stars - 1];
+            const pct = totalReviews ? (count / totalReviews) * 100 : 0;
+            return (
+              <div key={stars} className="flex items-center gap-2 text-xs">
+                <span className="w-6 text-muted-foreground">{stars}★</span>
+                <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full bg-amber-400" style={{ width: `${pct}%` }} />
+                </div>
+                <span className="w-8 text-right text-muted-foreground">{count}</span>
               </div>
-              <span className="w-8 text-right text-muted-foreground">{d.pct}%</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
-      <Separator />
+      <Separator className="mb-5" />
 
-      {/* Review list */}
-      <div className="space-y-5">
-        {reviews.map((r, i) => (
-          <div key={i} className="space-y-1.5" data-testid={`review-${i}`}>
-            <div className="flex items-center gap-3 flex-wrap">
-              <div
-                className="h-9 w-9 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0"
-                style={{ background: "linear-gradient(135deg, hsl(262 83% 58%), hsl(220 90% 60%))" }}
-              >
-                {r.name.charAt(0)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-sm">{r.name}</span>
-                  {r.verified && (
-                    <span className="inline-flex items-center gap-0.5 text-[10px] text-green-700 dark:text-green-400 font-semibold">
-                      <CheckCircle2 className="h-3 w-3" /> Verified buyer
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-0.5">
-                    {[1, 2, 3, 4, 5].map(n => (
-                      <Star
-                        key={n}
-                        aria-hidden="true"
-                        className={`h-3 w-3 ${n <= r.stars ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"}`}
-                      />
-                    ))}
-                  </div>
-                  <span>·</span>
-                  <span>{r.date}</span>
-                </div>
-              </div>
+      <ul className="space-y-5">
+        {visible.map(r => (
+          <li key={r.id} className="text-sm" data-testid={`review-${r.id}`}>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-semibold">{r.customer_name}</span>
+              {r.verified && (
+                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded">
+                  <CheckCircle2 className="h-3 w-3" /> Verified buyer
+                </span>
+              )}
+              <span className="text-xs text-muted-foreground ml-auto">{formatDate(r.created_at)}</span>
             </div>
-            <div className="font-semibold text-sm">{r.title}</div>
-            <p className="text-sm text-muted-foreground leading-relaxed">{r.body}</p>
-            <div className="text-xs text-muted-foreground inline-flex items-center gap-1 pt-1">
-              <ThumbsUp className="h-3 w-3" /> {r.helpful} found this helpful
+            <div className="flex items-center gap-0.5 mb-1.5" aria-label={`${r.rating} out of 5`}>
+              {[1, 2, 3, 4, 5].map(n => (
+                <Star key={n} aria-hidden="true" className={`h-3.5 w-3.5 ${n <= r.rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"}`} />
+              ))}
             </div>
-          </div>
+            {r.title && <div className="font-semibold mb-0.5">{r.title}</div>}
+            <p className="text-muted-foreground leading-relaxed">{r.body}</p>
+          </li>
         ))}
-      </div>
+      </ul>
 
-      {!showAll && totalReviews > 4 && (
-        <div className="text-center pt-2">
-          <Button variant="outline" onClick={() => setShowAll(true)} className="gap-1" data-testid="btn-show-more-reviews">
-            Show more reviews <ChevronDown className="h-4 w-4" />
-          </Button>
-        </div>
+      {sorted.length > 4 && (
+        <Button
+          variant="ghost"
+          className="mt-4 w-full"
+          onClick={() => setShowAll(s => !s)}
+          data-testid="btn-toggle-reviews"
+        >
+          {showAll ? "Show less" : `Show all ${sorted.length} reviews`} <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${showAll ? "rotate-180" : ""}`} />
+        </Button>
       )}
-
-      <div className="text-xs text-muted-foreground bg-muted/40 rounded-lg p-3">
-        Reviews collected from verified {productName} buyers via WhatsApp follow-up. Names abbreviated for privacy.
-      </div>
     </div>
   );
 }

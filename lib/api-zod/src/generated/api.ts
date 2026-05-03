@@ -132,6 +132,44 @@ export const DeleteProductParams = zod.object({
 });
 
 /**
+ * @summary List approved reviews for a product
+ */
+export const ListProductReviewsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const listProductReviewsResponseRatingMax = 5;
+
+export const ListProductReviewsResponseItem = zod.object({
+  id: zod.number(),
+  product_id: zod.number(),
+  customer_name: zod.string(),
+  rating: zod.number().min(1).max(listProductReviewsResponseRatingMax),
+  title: zod.string().optional(),
+  body: zod.string(),
+  verified: zod.boolean(),
+  created_at: zod.string(),
+});
+export const ListProductReviewsResponse = zod.array(
+  ListProductReviewsResponseItem,
+);
+
+/**
+ * @summary Submit a customer review (moderated before publishing)
+ */
+export const createReviewBodyRatingMax = 5;
+
+export const CreateReviewBody = zod.object({
+  product_id: zod.number(),
+  order_id: zod.number().optional(),
+  customer_phone: zod.string().optional(),
+  customer_name: zod.string(),
+  rating: zod.number().min(1).max(createReviewBodyRatingMax),
+  title: zod.string().optional(),
+  body: zod.string(),
+});
+
+/**
  * @summary List all categories
  */
 export const ListCategoriesResponseItem = zod.object({

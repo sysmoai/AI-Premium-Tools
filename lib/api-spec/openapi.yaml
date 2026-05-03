@@ -22,6 +22,8 @@ tags:
     description: Admin statistics
   - name: admin
     description: Admin authentication
+  - name: reviews
+    description: Product reviews
 paths:
   /healthz:
     get:
@@ -142,6 +144,47 @@ paths:
       responses:
         "204":
           description: Deleted
+
+  # ── Reviews ───────────────────────────────────────────────────────────────
+  /products/{id}/reviews:
+    get:
+      operationId: listProductReviews
+      tags: [reviews]
+      summary: List approved reviews for a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of approved reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Review"
+
+  /reviews:
+    post:
+      operationId: createReview
+      tags: [reviews]
+      summary: Submit a customer review (moderated before publishing)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewBody"
+      responses:
+        "201":
+          description: Review submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateReviewResponse"
 
   # ── Categories ────────────────────────────────────────────────────────────
   /categories:
@@ -684,6 +727,60 @@ components:
       required: [token]
       properties:
         token:
+          type: string
+
+    # ── Reviews ──────────────────────────────────────────────────────────────
+    Review:
+      type: object
+      required: [id, product_id, customer_name, rating, body, verified, created_at]
+      properties:
+        id:
+          type: integer
+        product_id:
+          type: integer
+        customer_name:
+          type: string
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        title:
+          type: string
+        body:
+          type: string
+        verified:
+          type: boolean
+        created_at:
+          type: string
+
+    CreateReviewBody:
+      type: object
+      required: [product_id, customer_name, rating, body]
+      properties:
+        product_id:
+          type: integer
+        order_id:
+          type: integer
+        customer_phone:
+          type: string
+        customer_name:
+          type: string
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        title:
+          type: string
+        body:
+          type: string
+
+    CreateReviewResponse:
+      type: object
+      required: [id, status]
+      properties:
+        id:
+          type: integer
+        status:
           type: string
 
     DashboardStats:

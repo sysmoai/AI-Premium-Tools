@@ -166,6 +166,40 @@ export interface AdminLoginResponse {
   token: string;
 }
 
+export interface Review {
+  id: number;
+  product_id: number;
+  customer_name: string;
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  rating: number;
+  title?: string;
+  body: string;
+  verified: boolean;
+  created_at: string;
+}
+
+export interface CreateReviewBody {
+  product_id: number;
+  order_id?: number;
+  customer_phone?: string;
+  customer_name: string;
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  rating: number;
+  title?: string;
+  body: string;
+}
+
+export interface CreateReviewResponse {
+  id: number;
+  status: string;
+}
+
 export interface DashboardStats {
   total_revenue_bdt: number;
   total_orders: number;
