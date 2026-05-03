@@ -188,7 +188,7 @@ export default function Checkout({ items, total, onClearCart }: CheckoutProps) {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone Number *</Label>
-                    <Input id="phone" value={form.phone} onChange={e => updateForm("phone", e.target.value)} placeholder="01XXXXXXXXX" required data-testid="input-phone" />
+                    <Input id="phone" value={form.phone} onChange={e => updateForm("phone", e.target.value)} placeholder="e.g. 01712345678" required data-testid="input-phone" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email (optional)</Label>
