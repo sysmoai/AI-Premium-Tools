@@ -152,9 +152,19 @@ export interface Customer {
 }
 
 export interface CreateCustomerBody {
+  /**
+   * @minLength 2
+   * @maxLength 100
+   */
   name: string;
+  /**
+   * Bangladeshi mobile number, 11 digits starting with 01.
+   * @pattern ^01[3-9]\d{8}$
+   */
   phone: string;
+  /** @maxLength 200 */
   email?: string;
+  /** @maxLength 200 */
   university?: string;
 }
 

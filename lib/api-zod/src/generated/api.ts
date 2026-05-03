@@ -375,11 +375,25 @@ export const ListCustomersResponse = zod.array(ListCustomersResponseItem);
 /**
  * @summary Create / register a customer
  */
+export const createCustomerBodyNameMin = 2;
+export const createCustomerBodyNameMax = 100;
+
+export const createCustomerBodyPhoneRegExp = new RegExp("^01[3-9]\\d{8}$");
+export const createCustomerBodyEmailMax = 200;
+
+export const createCustomerBodyUniversityMax = 200;
+
 export const CreateCustomerBody = zod.object({
-  name: zod.string(),
-  phone: zod.string(),
-  email: zod.string().optional(),
-  university: zod.string().optional(),
+  name: zod
+    .string()
+    .min(createCustomerBodyNameMin)
+    .max(createCustomerBodyNameMax),
+  phone: zod
+    .string()
+    .regex(createCustomerBodyPhoneRegExp)
+    .describe("Bangladeshi mobile number, 11 digits starting with 01."),
+  email: zod.string().email().max(createCustomerBodyEmailMax).optional(),
+  university: zod.string().max(createCustomerBodyUniversityMax).optional(),
 });
 
 /**

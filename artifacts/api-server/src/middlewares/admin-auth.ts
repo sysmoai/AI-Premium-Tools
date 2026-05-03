@@ -1,16 +1,15 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import type { Request, Response, NextFunction } from "express";
+import { logger } from "../lib/logger";
 
 const SESSION_SECRET = process.env["SESSION_SECRET"] ?? "";
 const ADMIN_PASSWORD = process.env["ADMIN_PASSWORD"] ?? "aipt2024";
 
 if (!SESSION_SECRET) {
-  // eslint-disable-next-line no-console
-  console.warn("SESSION_SECRET not set — admin tokens will be unstable");
+  logger.warn("SESSION_SECRET not set — admin tokens will be unstable across restarts");
 }
 if (!process.env["ADMIN_PASSWORD"]) {
-  // eslint-disable-next-line no-console
-  console.warn("ADMIN_PASSWORD not set — falling back to default; set this in Replit Secrets before deploying");
+  logger.warn("ADMIN_PASSWORD not set — falling back to default; set this in Replit Secrets before deploying");
 }
 
 export function getAdminPassword(): string {
