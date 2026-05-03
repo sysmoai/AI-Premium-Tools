@@ -96,34 +96,64 @@ export default function Checkout({ items, total, onClearCart }: CheckoutProps) {
     });
   }
 
+  function extractErrorMessage(err: unknown, fallback: string): string {
+    if (err && typeof err === "object") {
+      const e = err as { response?: { data?: { error?: string; message?: string } }; message?: string };
+      return e.response?.data?.error ?? e.response?.data?.message ?? e.message ?? fallback;
+    }
+    return fallback;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name || !form.phone) {
+    if (!form.name.trim() || !form.phone.trim()) {
       toast({ title: "Required fields missing", description: "Name and phone are required.", variant: "destructive" });
       return;
     }
-    if (!paymentRef) {
+    const phoneDigits = form.phone.replace(/[\s-]/g, "");
+    if (!/^(?:\+?880|0)1[3-9]\d{8}$/.test(phoneDigits)) {
+      toast({
+        title: "Invalid phone number",
+        description: "Enter a valid Bangladeshi mobile number (e.g. 01712345678).",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      toast({ title: "Invalid email", description: "Please enter a valid email address or leave it blank.", variant: "destructive" });
+      return;
+    }
+    if (!paymentRef.trim()) {
       toast({ title: "Payment reference required", description: "Enter your transaction/reference number.", variant: "destructive" });
       return;
     }
     setSubmitting(true);
     try {
       const customer = await createCustomer.mutateAsync({
-        data: { name: form.name, phone: form.phone, email: form.email || undefined, university: form.university || undefined },
+        data: {
+          name: form.name.trim(),
+          phone: phoneDigits,
+          email: form.email.trim() || undefined,
+          university: form.university.trim() || undefined,
+        },
       });
       const order = await createOrder.mutateAsync({
         data: {
           customer_id: customer.id,
           payment_method: paymentMethod,
-          payment_ref: paymentRef,
-          notes: form.notes || undefined,
+          payment_ref: paymentRef.trim(),
+          notes: form.notes.trim() || undefined,
           items: items.map(i => ({ product_id: i.productId, quantity: i.quantity })),
         },
       });
       onClearCart();
       navigate(`/order-success/${order.id}`);
-    } catch {
-      toast({ title: "Order failed", description: "Something went wrong. Please try again.", variant: "destructive" });
+    } catch (err) {
+      toast({
+        title: "Order failed",
+        description: extractErrorMessage(err, "Something went wrong. Please try again."),
+        variant: "destructive",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -206,11 +236,14 @@ export default function Checkout({ items, total, onClearCart }: CheckoutProps) {
             <Card>
               <CardContent className="p-6">
                 <h2 className="font-bold text-xl mb-6">Payment Method</h2>
-                <div className="grid grid-cols-3 gap-3 mb-6">
+                <div className="grid grid-cols-3 gap-3 mb-6" role="radiogroup" aria-label="Payment method">
                   {PAYMENT_METHODS.map(pm => (
                     <button
                       key={pm.id}
                       type="button"
+                      role="radio"
+                      aria-checked={paymentMethod === pm.id}
+                      aria-label={`Pay with ${pm.label}`}
                       onClick={() => setPaymentMethod(pm.id as typeof paymentMethod)}
                       className={`flex flex-col items-center justify-center gap-2 py-4 px-2 min-h-[72px] rounded-lg border-2 font-medium text-sm transition-all touch-manipulation ${
                         paymentMethod === pm.id ? pm.activeTint : "border-border hover:border-primary/30"

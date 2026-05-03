@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useListProducts, useListCategories } from "@workspace/api-client-react";
+import { useListProducts, useListCategories, useGetDashboardStats } from "@workspace/api-client-react";
 import { useInView } from "@/hooks/use-in-view";
 import { WHATSAPP_URL } from "@/config/contact";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
@@ -42,7 +42,13 @@ const TOOL_CHIPS = [
 export default function Home({ onAddToCart }: HomeProps) {
   const { data: featured, isLoading: featuredLoading } = useListProducts({ featured: true, is_active: true });
   const { data: categories, isLoading: catsLoading } = useListCategories();
+  const { data: stats } = useGetDashboardStats();
   const { ref: statRef, inView: statInView } = useInView();
+
+  const studentPackagesCat = categories?.find(c => c.slug === "student-packages");
+  const studentPackagesHref = studentPackagesCat ? `/products?category_id=${studentPackagesCat.id}` : "/products";
+  const totalToolsCount = stats?.total_products ?? 29;
+  const totalCustomersClaim = "1000+";
 
   return (
     <div className="min-h-screen">
@@ -110,7 +116,7 @@ export default function Home({ onAddToCart }: HomeProps) {
                   Shop All Tools <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <Link href="/products?category_id=5">
+              <Link href={studentPackagesHref}>
                 <Button
                   size="lg"
                   variant="outline"
@@ -123,7 +129,7 @@ export default function Home({ onAddToCart }: HomeProps) {
             </div>
             <div className="mt-12 flex flex-wrap gap-6 text-white/70 text-sm">
               <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-violet-300" /> Trusted by 1000+ students
+                <Shield className="h-4 w-4 text-violet-300" /> Trusted by {totalCustomersClaim} students
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-violet-300" /> Access within 1 hour
@@ -148,8 +154,8 @@ export default function Home({ onAddToCart }: HomeProps) {
       >
         <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-6 text-center text-white">
           {[
-            { label: "AI Tools", value: "29+" },
-            { label: "Happy Students", value: "1000+" },
+            { label: "AI Tools", value: `${totalToolsCount}+` },
+            { label: "Happy Customers", value: totalCustomersClaim },
             { label: "Avg Savings", value: "20%" },
             { label: "Delivery Time", value: "1 hr" },
           ].map(stat => (
@@ -179,7 +185,7 @@ export default function Home({ onAddToCart }: HomeProps) {
                   </div>
                   <div className="font-bold text-sm leading-tight group-hover:text-primary transition-colors">All Tools</div>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                    29+ tools
+                    {totalToolsCount}+ tools
                   </span>
                 </CardContent>
               </Card>
@@ -336,7 +342,7 @@ export default function Home({ onAddToCart }: HomeProps) {
             }}
           />
           <h2 className="relative text-4xl font-black mb-4" style={{ fontFamily: "Outfit, sans-serif" }}>Ready to level up?</h2>
-          <p className="relative text-muted-foreground text-lg mb-8">Join 1000+ Bangladeshi students already using AIPT tools.</p>
+          <p className="relative text-muted-foreground text-lg mb-8">Join {totalCustomersClaim} Bangladeshi customers already using AIPT tools.</p>
           <div className="relative flex flex-wrap gap-4 justify-center">
             <Link href="/products">
               <Button

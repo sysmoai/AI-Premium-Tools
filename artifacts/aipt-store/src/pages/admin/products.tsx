@@ -71,19 +71,45 @@ export default function AdminProducts() {
     setForm(prev => ({ ...prev, [field]: value }));
   }
 
+  function extractErrorMessage(err: unknown, fallback: string): string {
+    if (err && typeof err === "object") {
+      const e = err as { response?: { data?: { error?: string; message?: string } }; message?: string };
+      return e.response?.data?.error ?? e.response?.data?.message ?? e.message ?? fallback;
+    }
+    return fallback;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.name.trim()) {
+      toast({ title: "Name required", variant: "destructive" });
+      return;
+    }
+    const priceNum = Number(form.price_bdt);
+    if (!form.price_bdt || isNaN(priceNum) || priceNum <= 0) {
+      toast({ title: "Invalid price", description: "Price must be a positive number.", variant: "destructive" });
+      return;
+    }
+    if (!form.category_id) {
+      toast({ title: "Category required", description: "Please select a category for this product.", variant: "destructive" });
+      return;
+    }
+    const origPriceNum = form.original_price_bdt ? Number(form.original_price_bdt) : undefined;
+    if (origPriceNum !== undefined && (isNaN(origPriceNum) || origPriceNum < 0)) {
+      toast({ title: "Invalid original price", variant: "destructive" });
+      return;
+    }
     const payload = {
-      name: form.name,
-      description: form.description || undefined,
-      price_bdt: Number(form.price_bdt),
-      original_price_bdt: form.original_price_bdt ? Number(form.original_price_bdt) : undefined,
-      category_id: form.category_id ? Number(form.category_id) : 0,
+      name: form.name.trim(),
+      description: form.description.trim() || undefined,
+      price_bdt: priceNum,
+      original_price_bdt: origPriceNum,
+      category_id: Number(form.category_id),
       duration_days: Number(form.duration_days) || 30,
       is_featured: form.is_featured,
       is_active: form.is_active,
       features: form.features ? form.features.split("\n").map(f => f.trim()).filter(Boolean) : undefined,
-      image_url: form.image_url,
+      image_url: form.image_url.trim(),
     };
     try {
       if (editId) {
@@ -95,8 +121,12 @@ export default function AdminProducts() {
       }
       queryClient.invalidateQueries({ queryKey: ["listProducts"] });
       setShowDialog(false);
-    } catch {
-      toast({ title: "Save failed", variant: "destructive" });
+    } catch (err) {
+      toast({
+        title: "Save failed",
+        description: extractErrorMessage(err, "Could not save product. Please check fields and try again."),
+        variant: "destructive",
+      });
     }
   }
 
@@ -236,14 +266,15 @@ export default function AdminProducts() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Category</Label>
+                <Label>Category *</Label>
                 <select
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={form.category_id}
                   onChange={e => updateForm("category_id", e.target.value)}
+                  required
                   data-testid="select-product-category"
                 >
-                  <option value="">No category</option>
+                  <option value="">Select a category</option>
                   {categories?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
