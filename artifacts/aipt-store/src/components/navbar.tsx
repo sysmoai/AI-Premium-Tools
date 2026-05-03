@@ -18,7 +18,7 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { WHATSAPP_URL } from "@/config/contact";
 import { useListCategories, useListProducts } from "@workspace/api-client-react";
 
@@ -342,6 +342,8 @@ export default function Navbar({ cartCount }: NavbarProps) {
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-80 overflow-y-auto">
+                <SheetTitle className="sr-only">Navigation menu</SheetTitle>
+                <SheetDescription className="sr-only">Browse AIPT pages, search tools, and access your cart</SheetDescription>
                 {/* Mobile search */}
                 <form onSubmit={submitSearch} className="mt-8 mb-4 relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />

@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useListProducts, useCreateProduct, useUpdateProduct, useListCategories } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -225,6 +225,9 @@ export default function AdminProducts() {
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" data-testid="dialog-product-form">
           <DialogHeader>
             <DialogTitle>{editId ? "Edit Product" : "Add Product"}</DialogTitle>
+            <DialogDescription>
+              {editId ? "Update this product's details, pricing, and visibility." : "Add a new AI tool subscription to the catalog."}
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 mt-2">
             <div className="space-y-1.5">
@@ -241,7 +244,7 @@ export default function AdminProducts() {
                 <Input
                   value={form.image_url}
                   onChange={e => updateForm("image_url", e.target.value)}
-                  placeholder="https://logo.clearbit.com/openai.com"
+                  placeholder="/logos/openai.svg"
                   data-testid="input-product-image-url"
                 />
                 {form.image_url && (
