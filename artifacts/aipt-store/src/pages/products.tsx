@@ -17,9 +17,10 @@ export default function Products({ onAddToCart }: ProductsProps) {
   const search = useSearch();
   const params = new URLSearchParams(search);
   const initialCatId = params.get("category_id") ? Number(params.get("category_id")) : undefined;
+  const initialQuery = params.get("q") ?? "";
 
   const [selectedCategory, setSelectedCategory] = useState<number | undefined>(initialCatId);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
 
   const { data: products, isLoading } = useListProducts({
     is_active: true,

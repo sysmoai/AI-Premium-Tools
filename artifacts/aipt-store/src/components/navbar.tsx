@@ -1,21 +1,50 @@
 import { Link, useLocation } from "wouter";
-import { ShoppingCart, Menu, X, Moon, Sun, MessageCircle } from "lucide-react";
+import {
+  ShoppingCart,
+  Menu,
+  X,
+  Moon,
+  Sun,
+  MessageCircle,
+  Search,
+  ChevronDown,
+  Sparkles,
+  ShieldCheck,
+  Clock,
+  Wallet,
+  User,
+} from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { WHATSAPP_URL } from "@/config/contact";
+import { useListCategories } from "@workspace/api-client-react";
 
 interface NavbarProps {
   cartCount: number;
 }
 
+const ANNOUNCEMENTS = [
+  { icon: ShieldCheck, text: "30-day warranty on every order" },
+  { icon: Clock, text: "Activation within 1 hour after payment" },
+  { icon: Wallet, text: "bKash · Nagad · Rocket · Bank Transfer" },
+  { icon: Sparkles, text: "Trusted by 1,000+ Bangladeshi students & freelancers" },
+];
+
 export default function Navbar({ cartCount }: NavbarProps) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
   const [open, setOpen] = useState(false);
   const [badgePop, setBadgePop] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+  const [catsOpen, setCatsOpen] = useState(false);
+  const [annIdx, setAnnIdx] = useState(0);
   const prevCount = useRef(cartCount);
+  const catsRef = useRef<HTMLDivElement>(null);
+
+  const { data: categories } = useListCategories();
 
   function toggleDark() {
     const next = !dark;
@@ -43,143 +72,280 @@ export default function Navbar({ cartCount }: NavbarProps) {
     return undefined;
   }, [cartCount]);
 
+  // Rotate announcement bar every 4s
+  useEffect(() => {
+    const t = setInterval(() => setAnnIdx(i => (i + 1) % ANNOUNCEMENTS.length), 4000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Close categories dropdown on outside click
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (catsRef.current && !catsRef.current.contains(e.target as Node)) {
+        setCatsOpen(false);
+      }
+    }
+    if (catsOpen) {
+      document.addEventListener("mousedown", onClick);
+      return () => document.removeEventListener("mousedown", onClick);
+    }
+    return undefined;
+  }, [catsOpen]);
+
   const isActive = (path: string) => location === path;
+
+  function submitSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const q = searchValue.trim();
+    navigate(q ? `/products?q=${encodeURIComponent(q)}` : "/products");
+    setOpen(false);
+  }
 
   const navLinks = [
     { href: "/", label: "Home" },
     { href: "/products", label: "All Tools" },
   ];
 
+  const Ann = ANNOUNCEMENTS[annIdx];
+  const AnnIcon = Ann.icon;
+
   return (
-    <header
-      className="sticky top-0 z-50 backdrop-blur-xl"
-      style={{
-        background: "hsl(var(--background) / 0.85)",
-        borderBottom: "1px solid",
-        borderImage: "linear-gradient(90deg, hsl(var(--primary) / 0.3), hsl(var(--secondary) / 0.2), hsl(var(--primary) / 0.1)) 1",
-        boxShadow: "0 1px 20px hsl(var(--primary) / 0.06)",
-      }}
-    >
-      <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        {/* Logo */}
-        <Link href="/">
-          <div className="flex items-center gap-2.5 cursor-pointer" data-testid="link-logo">
-            <div
-              className="h-9 w-9 rounded-lg flex items-center justify-center font-black text-sm text-white shadow-md"
-              style={{
-                background: "linear-gradient(135deg, hsl(262 83% 58%), hsl(220 90% 60%))",
-                fontFamily: "Outfit, sans-serif",
-                boxShadow: "0 2px 12px hsl(262 83% 58% / 0.4)",
-              }}
-            >
-              AI
-            </div>
-            <span className="font-black text-xl" style={{ fontFamily: "Outfit, sans-serif" }}>
-              AIPT
-            </span>
+    <header className="sticky top-0 z-50 backdrop-blur-xl">
+      {/* Announcement bar */}
+      <div
+        className="text-white text-xs font-medium"
+        style={{ background: "linear-gradient(90deg, hsl(262 83% 28%), hsl(220 90% 30%))" }}
+      >
+        <div className="max-w-6xl mx-auto px-4 h-8 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 truncate">
+            <AnnIcon className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate" data-testid="text-announcement">{Ann.text}</span>
           </div>
-        </Link>
-
-        {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-1">
-          {navLinks.map(link => (
-            <Link key={link.href} href={link.href}>
-              <span
-                className={`px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
-                  isActive(link.href)
-                    ? "bg-primary/10 text-primary"
-                    : "hover:bg-muted"
-                }`}
-                data-testid={`nav-${link.label.toLowerCase().replace(/ /g, "-")}`}
-              >
-                {link.label}
-              </span>
-            </Link>
-          ))}
-        </nav>
-
-        {/* Actions */}
-        <div className="flex items-center gap-2">
-          {/* WhatsApp CTA */}
           <a
             href={WHATSAPP_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white text-xs font-semibold transition-all hover:scale-105 shadow-sm"
-            style={{ background: "linear-gradient(135deg, #25d366, #128c7e)" }}
-            data-testid="btn-whatsapp"
+            className="hidden sm:flex items-center gap-1 hover:underline shrink-0"
+            data-testid="link-announcement-whatsapp"
           >
-            <MessageCircle className="h-3.5 w-3.5" />
-            WhatsApp Support
+            <MessageCircle className="h-3 w-3" />
+            <span>Need help? Chat on WhatsApp</span>
           </a>
+        </div>
+      </div>
 
-          <Button variant="ghost" size="icon" onClick={toggleDark} data-testid="btn-toggle-dark">
-            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
+      {/* Main nav */}
+      <div
+        style={{
+          background: "hsl(var(--background) / 0.85)",
+          borderBottom: "1px solid",
+          borderImage: "linear-gradient(90deg, hsl(var(--primary) / 0.3), hsl(var(--secondary) / 0.2), hsl(var(--primary) / 0.1)) 1",
+          boxShadow: "0 1px 20px hsl(var(--primary) / 0.06)",
+        }}
+      >
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center gap-4">
+          {/* Logo */}
+          <Link href="/">
+            <div className="flex items-center gap-2.5 cursor-pointer shrink-0" data-testid="link-logo">
+              <div
+                className="h-9 w-9 rounded-lg flex items-center justify-center font-black text-sm text-white shadow-md"
+                style={{
+                  background: "linear-gradient(135deg, hsl(262 83% 58%), hsl(220 90% 60%))",
+                  fontFamily: "Outfit, sans-serif",
+                  boxShadow: "0 2px 12px hsl(262 83% 58% / 0.4)",
+                }}
+              >
+                AI
+              </div>
+              <span className="font-black text-xl hidden sm:inline" style={{ fontFamily: "Outfit, sans-serif" }}>
+                AIPT
+              </span>
+            </div>
+          </Link>
 
-          <Link href="/cart">
-            <Button variant="ghost" size="icon" className="relative" data-testid="btn-cart">
-              <ShoppingCart className="h-5 w-5" />
-              {cartCount > 0 && (
-                <Badge
-                  className={`absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs rounded-full bg-primary text-primary-foreground border-2 border-background transition-transform ${badgePop ? "badge-pop" : ""}`}
-                  data-testid="badge-cart-count"
+          {/* Desktop nav + Categories dropdown */}
+          <nav className="hidden lg:flex items-center gap-1">
+            {navLinks.map(link => (
+              <Link key={link.href} href={link.href}>
+                <span
+                  className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
+                    isActive(link.href) ? "bg-primary/10 text-primary" : "hover:bg-muted"
+                  }`}
+                  data-testid={`nav-${link.label.toLowerCase().replace(/ /g, "-")}`}
                 >
-                  {cartCount}
-                </Badge>
+                  {link.label}
+                </span>
+              </Link>
+            ))}
+            <div ref={catsRef} className="relative">
+              <button
+                onClick={() => setCatsOpen(o => !o)}
+                className="px-3 py-2 rounded-lg text-sm font-medium hover:bg-muted flex items-center gap-1"
+                data-testid="btn-categories"
+              >
+                Categories
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${catsOpen ? "rotate-180" : ""}`} />
+              </button>
+              {catsOpen && (
+                <div
+                  className="absolute top-full left-0 mt-2 w-64 bg-background border border-border rounded-xl shadow-2xl py-2 z-50"
+                  style={{ boxShadow: "0 10px 40px hsl(var(--primary) / 0.15)" }}
+                  data-testid="menu-categories"
+                >
+                  {categories?.map(cat => (
+                    <Link key={cat.id} href={`/products?category_id=${cat.id}`}>
+                      <span
+                        onClick={() => setCatsOpen(false)}
+                        className="block px-4 py-2.5 text-sm hover:bg-muted cursor-pointer transition-colors"
+                        data-testid={`menu-cat-${cat.slug}`}
+                      >
+                        {cat.name}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
               )}
-            </Button>
-          </Link>
+            </div>
+          </nav>
 
-          <Link href="/admin">
-            <Button variant="outline" size="sm" className="hidden md:flex" data-testid="btn-admin">
-              Admin
-            </Button>
-          </Link>
+          {/* Search bar (desktop) */}
+          <form onSubmit={submitSearch} className="hidden md:flex flex-1 max-w-md relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="search"
+              value={searchValue}
+              onChange={e => setSearchValue(e.target.value)}
+              placeholder="Search ChatGPT, Claude, Midjourney…"
+              className="pl-9 h-10 rounded-full bg-muted/50 border-muted focus-visible:bg-background"
+              data-testid="input-navbar-search"
+            />
+          </form>
 
-          {/* Mobile menu */}
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden" data-testid="btn-mobile-menu">
-                {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          {/* Right actions */}
+          <div className="flex items-center gap-1.5 ml-auto md:ml-0">
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white text-xs font-semibold transition-all hover:scale-105 shadow-sm"
+              style={{ background: "linear-gradient(135deg, #25d366, #128c7e)" }}
+              data-testid="btn-whatsapp"
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              WhatsApp
+            </a>
+
+            <Button variant="ghost" size="icon" onClick={toggleDark} aria-label="Toggle dark mode" data-testid="btn-toggle-dark">
+              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+
+            <Link href="/cart">
+              <Button variant="ghost" size="icon" className="relative" aria-label="Cart" data-testid="btn-cart">
+                <ShoppingCart className="h-5 w-5" />
+                {cartCount > 0 && (
+                  <Badge
+                    className={`absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs rounded-full bg-primary text-primary-foreground border-2 border-background transition-transform ${badgePop ? "badge-pop" : ""}`}
+                    data-testid="badge-cart-count"
+                  >
+                    {cartCount}
+                  </Badge>
+                )}
               </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-72">
-              <div className="flex flex-col gap-4 mt-8">
-                {navLinks.map(link => (
-                  <Link key={link.href} href={link.href}>
+            </Link>
+
+            <Link href="/admin">
+              <Button variant="outline" size="sm" className="hidden md:flex gap-1.5" data-testid="btn-admin">
+                <User className="h-3.5 w-3.5" />
+                Admin
+              </Button>
+            </Link>
+
+            {/* Mobile menu */}
+            <Sheet open={open} onOpenChange={setOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Menu" data-testid="btn-mobile-menu">
+                  {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-80 overflow-y-auto">
+                {/* Mobile search */}
+                <form onSubmit={submitSearch} className="mt-8 mb-4 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    type="search"
+                    value={searchValue}
+                    onChange={e => setSearchValue(e.target.value)}
+                    placeholder="Search tools…"
+                    className="pl-9 h-10"
+                    data-testid="input-mobile-search"
+                  />
+                </form>
+
+                <div className="flex flex-col gap-1">
+                  {navLinks.map(link => (
+                    <Link key={link.href} href={link.href}>
+                      <span
+                        className={`block px-4 py-3 rounded-lg text-base font-medium cursor-pointer transition-colors ${
+                          isActive(link.href) ? "bg-primary/10 text-primary" : "hover:bg-muted"
+                        }`}
+                        onClick={() => setOpen(false)}
+                      >
+                        {link.label}
+                      </span>
+                    </Link>
+                  ))}
+
+                  <div className="mt-3 mb-2 px-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Categories
+                  </div>
+                  {categories?.map(cat => (
+                    <Link key={cat.id} href={`/products?category_id=${cat.id}`}>
+                      <span
+                        className="block px-4 py-2.5 rounded-lg text-sm cursor-pointer hover:bg-muted"
+                        onClick={() => setOpen(false)}
+                      >
+                        {cat.name}
+                      </span>
+                    </Link>
+                  ))}
+
+                  <div className="mt-3 mb-2 px-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Account
+                  </div>
+                  <Link href="/cart">
                     <span
-                      className={`block px-4 py-3 rounded-lg text-base font-medium cursor-pointer transition-colors ${
-                        isActive(link.href) ? "bg-primary/10 text-primary" : "hover:bg-muted"
-                      }`}
+                      className="flex items-center gap-2 px-4 py-3 rounded-lg text-base font-medium cursor-pointer hover:bg-muted"
                       onClick={() => setOpen(false)}
                     >
-                      {link.label}
+                      <ShoppingCart className="h-4 w-4" />
+                      Cart {cartCount > 0 && <Badge className="ml-auto">{cartCount}</Badge>}
                     </span>
                   </Link>
-                ))}
-                <Link href="/admin">
-                  <span
-                    className="block px-4 py-3 rounded-lg text-base font-medium cursor-pointer hover:bg-muted"
+                  <Link href="/admin">
+                    <span
+                      className="flex items-center gap-2 px-4 py-3 rounded-lg text-base font-medium cursor-pointer hover:bg-muted"
+                      onClick={() => setOpen(false)}
+                    >
+                      <User className="h-4 w-4" />
+                      Admin Panel
+                    </span>
+                  </Link>
+
+                  <a
+                    href={WHATSAPP_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-4 py-3 mt-4 rounded-lg text-white font-medium"
+                    style={{ background: "linear-gradient(135deg, #25d366, #128c7e)" }}
                     onClick={() => setOpen(false)}
                   >
-                    Admin Panel
-                  </span>
-                </Link>
-                <a
-                  href={WHATSAPP_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-3 rounded-lg text-white font-medium"
-                  style={{ background: "linear-gradient(135deg, #25d366, #128c7e)" }}
-                  onClick={() => setOpen(false)}
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  WhatsApp Support
-                </a>
-              </div>
-            </SheetContent>
-          </Sheet>
+                    <MessageCircle className="h-4 w-4" />
+                    WhatsApp Support
+                  </a>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </div>
     </header>
