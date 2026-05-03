@@ -292,4 +292,10 @@ Full refund if we fail to deliver within 24 hours. After delivery, free replacem
 - Home: https://aipt.com.bd/
 - All products: https://aipt.com.bd/products
 - FAQ: https://aipt.com.bd/faq
+- About: https://aipt.com.bd/about
+- Contact: https://aipt.com.bd/contact
+- Delivery policy: https://aipt.com.bd/shipping-policy
+- Refund &amp; replacement policy: https://aipt.com.bd/refund-policy
+- Privacy policy: https://aipt.com.bd/privacy-policy
+- Terms of service: https://aipt.com.bd/terms
 - Track order: https://aipt.com.bd/track-order

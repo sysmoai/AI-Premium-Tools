@@ -64,6 +64,12 @@ async function main() {
     { loc: "/", priority: "1.0", changefreq: "daily" },
     { loc: "/products", priority: "0.9", changefreq: "daily" },
     { loc: "/faq", priority: "0.7", changefreq: "weekly" },
+    { loc: "/about", priority: "0.6", changefreq: "monthly" },
+    { loc: "/contact", priority: "0.6", changefreq: "monthly" },
+    { loc: "/shipping-policy", priority: "0.5", changefreq: "monthly" },
+    { loc: "/refund-policy", priority: "0.5", changefreq: "monthly" },
+    { loc: "/privacy-policy", priority: "0.4", changefreq: "monthly" },
+    { loc: "/terms", priority: "0.4", changefreq: "monthly" },
     { loc: "/track-order", priority: "0.5", changefreq: "monthly" },
     ...cats.map(c => ({
       loc: `/products?category_id=${c.id}`,
@@ -165,6 +171,12 @@ async function main() {
   lines.push(`- Home: ${ORIGIN}/`);
   lines.push(`- All products: ${ORIGIN}/products`);
   lines.push(`- FAQ: ${ORIGIN}/faq`);
+  lines.push(`- About: ${ORIGIN}/about`);
+  lines.push(`- Contact: ${ORIGIN}/contact`);
+  lines.push(`- Delivery policy: ${ORIGIN}/shipping-policy`);
+  lines.push(`- Refund &amp; replacement policy: ${ORIGIN}/refund-policy`);
+  lines.push(`- Privacy policy: ${ORIGIN}/privacy-policy`);
+  lines.push(`- Terms of service: ${ORIGIN}/terms`);
   lines.push(`- Track order: ${ORIGIN}/track-order`);
 
   writeFileSync(resolve(PUBLIC_DIR, "llms.txt"), lines.join("\n") + "\n");

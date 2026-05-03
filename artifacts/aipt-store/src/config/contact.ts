@@ -11,4 +11,4 @@ export const BANK_INFO: string =
   (import.meta.env.VITE_BANK_INFO as string | undefined) ?? "Dutch-Bangla Bank";
 
 export const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`;
-export const WHATSAPP_HOURS = "Available 9am – 11pm daily";
+export const WHATSAPP_HOURS = "Available 10am – 11pm daily";

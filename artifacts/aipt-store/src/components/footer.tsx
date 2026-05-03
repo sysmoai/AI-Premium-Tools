@@ -291,9 +291,12 @@ export default function Footer() {
           <div className="border-t border-border mt-6 pt-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
             <div>© {new Date().getFullYear()} AI Premium Tools (AIPT). All rights reserved.</div>
             <div className="flex items-center gap-4">
-              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Privacy</a>
-              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Terms</a>
-              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Refund Policy</a>
+              <Link href="/about" className="hover:text-foreground transition-colors">About</Link>
+              <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
+              <Link href="/shipping-policy" className="hover:text-foreground transition-colors">Delivery</Link>
+              <Link href="/refund-policy" className="hover:text-foreground transition-colors">Refund Policy</Link>
+              <Link href="/privacy-policy" className="hover:text-foreground transition-colors">Privacy</Link>
+              <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
               <span className="hidden md:inline">Made with ❤️ in Bangladesh</span>
             </div>
           </div>

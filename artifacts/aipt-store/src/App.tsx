@@ -14,6 +14,12 @@ import Checkout from "@/pages/checkout";
 import OrderSuccess from "@/pages/order-success";
 import TrackOrder from "@/pages/track-order";
 import Faq from "@/pages/faq";
+import About from "@/pages/about";
+import Contact from "@/pages/contact";
+import ShippingPolicy from "@/pages/shipping-policy";
+import RefundPolicy from "@/pages/refund-policy";
+import PrivacyPolicy from "@/pages/privacy-policy";
+import Terms from "@/pages/terms";
 import { ErrorBoundary } from "@/components/error-boundary";
 import AdminLogin from "@/pages/admin/login";
 import AdminDashboard from "@/pages/admin/dashboard";
@@ -68,6 +74,12 @@ function AppInner() {
           <Route path="/order-success/:id" component={OrderSuccess} />
           <Route path="/track-order" component={TrackOrder} />
           <Route path="/faq" component={Faq} />
+          <Route path="/about" component={About} />
+          <Route path="/contact" component={Contact} />
+          <Route path="/shipping-policy" component={ShippingPolicy} />
+          <Route path="/refund-policy" component={RefundPolicy} />
+          <Route path="/privacy-policy" component={PrivacyPolicy} />
+          <Route path="/terms" component={Terms} />
 
           {/* Admin routes */}
           <Route path="/admin">
