@@ -9,6 +9,8 @@ import { useInView } from "@/hooks/use-in-view";
 import { WHATSAPP_URL } from "@/config/contact";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
 import { useSeo } from "@/hooks/use-seo";
+import { useRecentlyViewed } from "@/hooks/use-recently-viewed";
+import { Clock as ClockIcon } from "lucide-react";
 
 interface HomeProps {
   onAddToCart: (product: { productId: number; name: string; price_bdt: number; image_url?: string; duration_days?: number }) => void;
@@ -42,9 +44,15 @@ const TOOL_CHIPS = [
 
 export default function Home({ onAddToCart }: HomeProps) {
   const { data: featured, isLoading: featuredLoading } = useListProducts({ featured: true, is_active: true });
+  const { data: allProducts } = useListProducts({ is_active: true });
   const { data: categories, isLoading: catsLoading } = useListCategories();
   const { data: stats } = useGetDashboardStats();
   const { ref: statRef, inView: statInView } = useInView();
+  const { ids: recentIds } = useRecentlyViewed();
+  const recentProducts = recentIds
+    .map(rid => allProducts?.find(p => p.id === rid))
+    .filter((p): p is NonNullable<typeof p> => Boolean(p))
+    .slice(0, 4);
 
   const studentPackagesCat = categories?.find(c => c.slug === "student-packages");
   const studentPackagesHref = studentPackagesCat ? `/products?category_id=${studentPackagesCat.id}` : "/products";
@@ -183,6 +191,62 @@ export default function Home({ onAddToCart }: HomeProps) {
           ))}
         </div>
       </section>
+
+      {/* Recently Viewed */}
+      {recentProducts.length > 0 && (
+        <section className="max-w-6xl mx-auto px-4 pt-14 pb-2" data-testid="section-recently-viewed">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <ClockIcon className="h-5 w-5 text-primary" />
+              <h2 className="text-2xl font-black" style={{ fontFamily: "Outfit, sans-serif" }}>
+                Recently viewed
+              </h2>
+            </div>
+            <Link href="/products">
+              <Button variant="ghost" size="sm" className="gap-1">
+                View all <ChevronRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {recentProducts.map(p => {
+              const grad = getProductGradient(p.name);
+              const sav = p.original_price_bdt ? Math.round((1 - p.price_bdt / p.original_price_bdt) * 100) : 0;
+              return (
+                <Link key={p.id} href={`/products/${p.id}`}>
+                  <Card
+                    className="overflow-hidden h-full hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer"
+                    data-testid={`recent-product-${p.id}`}
+                  >
+                    <ProductLogoBanner
+                      name={p.name}
+                      imageUrl={p.image_url}
+                      gradient={grad}
+                      size="card"
+                      isFeatured={p.is_featured ?? false}
+                      savingsPct={sav}
+                    />
+                    <CardContent className="p-4">
+                      <div className="font-bold text-sm line-clamp-1 mb-1">{p.name}</div>
+                      <div className="text-xs text-muted-foreground line-clamp-2 mb-3 min-h-[2rem]">{p.description}</div>
+                      <div className="flex items-baseline gap-2">
+                        <div className="font-black text-primary" style={{ fontFamily: "Outfit, sans-serif" }}>
+                          ৳{p.price_bdt.toLocaleString("en-BD")}
+                        </div>
+                        {p.original_price_bdt && (
+                          <div className="text-xs text-muted-foreground line-through">
+                            ৳{p.original_price_bdt.toLocaleString("en-BD")}
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Categories */}
       <section className="max-w-6xl mx-auto px-4 py-16">

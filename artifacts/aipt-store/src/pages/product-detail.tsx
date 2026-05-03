@@ -38,6 +38,8 @@ import {
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSeo } from "@/hooks/use-seo";
+import { useRecentlyViewed } from "@/hooks/use-recently-viewed";
+import { getProductRating, getProductReviewCount } from "@/hooks/use-product-rating";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
 import { WHATSAPP_URL } from "@/config/contact";
 
@@ -58,21 +60,9 @@ const TRUST_BADGES = [
   { Icon: Lock, title: "Secure Payment", desc: "bKash · Nagad · Bank" },
 ];
 
-// Deterministic 4.6-4.95 rating from product ID (looks organic, never below 4.6)
-function getRating(id: number) {
-  const seed = (id * 9301 + 49297) % 233280;
-  const r = 4.6 + (seed / 233280) * 0.35;
-  return Math.round(r * 10) / 10;
-}
 
-// Deterministic order count between 47 and 312
-function getReviewCount(id: number) {
-  const seed = (id * 1103515245 + 12345) % 2147483648;
-  return 47 + (seed % 266);
-}
-
-function FaqItems({ productName, durationDays }: { productName: string; durationDays: number }) {
-  const items = [
+function getFaqItems(productName: string, durationDays: number) {
+  return [
     {
       q: `How will I receive my ${productName} access?`,
       a: `After we confirm your payment, we send your login credentials directly via WhatsApp. Activation usually completes within 1 hour during 10am–11pm daily.`,
@@ -98,6 +88,10 @@ function FaqItems({ productName, durationDays }: { productName: string; duration
       a: "Yes — if we're unable to deliver your order within 24 hours, you get a full refund. Once delivered, we offer free replacement instead of refund within the warranty period.",
     },
   ];
+}
+
+function FaqItems({ productName, durationDays }: { productName: string; durationDays: number }) {
+  const items = getFaqItems(productName, durationDays);
   return (
     <Accordion type="single" collapsible className="w-full">
       {items.map((item, i) => (
@@ -116,6 +110,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { track: trackViewed } = useRecentlyViewed();
   const productId = Number(id);
 
   const { data: product, isLoading } = useGetProduct(productId, {
@@ -135,8 +130,13 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [id]);
 
-  const rating = useMemo(() => (product ? getRating(product.id) : 0), [product]);
-  const reviewCount = useMemo(() => (product ? getReviewCount(product.id) : 0), [product]);
+  // Record this product as recently viewed
+  useEffect(() => {
+    if (product?.id) trackViewed(product.id);
+  }, [product?.id, trackViewed]);
+
+  const rating = useMemo(() => (product ? getProductRating(product.id) : 0), [product]);
+  const reviewCount = useMemo(() => (product ? getProductReviewCount(product.id) : 0), [product]);
 
   // SEO: dynamic title, description, JSON-LD Product schema
   const seoTitle = product ? `${product.name} — Buy in Bangladesh at ৳${product.price_bdt}` : "Product";
@@ -146,36 +146,63 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
   const seoKeywords = product
     ? `${product.name}, ${product.name} Bangladesh, ${product.name} BDT, buy ${product.name}, ${product.category_name}, AI tools Bangladesh, AIPT`
     : undefined;
-  const jsonLd = product
-    ? {
-        "@context": "https://schema.org",
-        "@type": "Product",
-        name: product.name,
-        description: product.description,
-        image: product.image_url ? [product.image_url] : undefined,
-        sku: `AIPT-${product.id}`,
-        category: product.category_name,
-        brand: { "@type": "Brand", name: "AIPT" },
-        offers: {
-          "@type": "Offer",
-          url: typeof window !== "undefined" ? window.location.href : undefined,
-          priceCurrency: "BDT",
-          price: product.price_bdt,
-          availability:
-            product.stock_count === undefined || (product.stock_count ?? 1) > 0
-              ? "https://schema.org/InStock"
-              : "https://schema.org/OutOfStock",
-          itemCondition: "https://schema.org/NewCondition",
-          seller: { "@type": "Organization", name: "AIPT — AI Premium Tools" },
+  const jsonLd: Array<Record<string, unknown>> | null = product
+    ? [
+        {
+          "@context": "https://schema.org",
+          "@type": "Product",
+          name: product.name,
+          description: product.description,
+          image: product.image_url ? [product.image_url] : undefined,
+          sku: `AIPT-${product.id}`,
+          category: product.category_name,
+          brand: { "@type": "Brand", name: "AIPT" },
+          offers: {
+            "@type": "Offer",
+            url: typeof window !== "undefined" ? window.location.href : undefined,
+            priceCurrency: "BDT",
+            price: product.price_bdt,
+            availability:
+              product.stock_count === undefined || (product.stock_count ?? 1) > 0
+                ? "https://schema.org/InStock"
+                : "https://schema.org/OutOfStock",
+            itemCondition: "https://schema.org/NewCondition",
+            seller: { "@type": "Organization", name: "AIPT — AI Premium Tools" },
+          },
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: rating,
+            reviewCount,
+            bestRating: 5,
+            worstRating: 1,
+          },
         },
-        aggregateRating: {
-          "@type": "AggregateRating",
-          ratingValue: rating,
-          reviewCount,
-          bestRating: 5,
-          worstRating: 1,
+        {
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Home", item: "/" },
+            { "@type": "ListItem", position: 2, name: "All Tools", item: "/products" },
+            ...(product.category_name
+              ? [{ "@type": "ListItem", position: 3, name: product.category_name, item: `/products?category_id=${product.category_id}` }]
+              : []),
+            {
+              "@type": "ListItem",
+              position: product.category_name ? 4 : 3,
+              name: product.name,
+            },
+          ],
         },
-      }
+        {
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: getFaqItems(product.name, product.duration_days || 30).map(item => ({
+            "@type": "Question",
+            name: item.q,
+            acceptedAnswer: { "@type": "Answer", text: item.a },
+          })),
+        },
+      ]
     : null;
 
   useSeo({

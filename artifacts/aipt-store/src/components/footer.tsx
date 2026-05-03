@@ -200,9 +200,11 @@ export default function Footer() {
                   </Link>
                 </div>
                 <div>
-                  <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
-                    Order Tracking
-                  </a>
+                  <Link href="/track-order">
+                    <span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
+                      Order Tracking
+                    </span>
+                  </Link>
                 </div>
                 <div>
                   <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">

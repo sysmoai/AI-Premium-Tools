@@ -12,6 +12,7 @@ import ProductDetail from "@/pages/product-detail";
 import Cart from "@/pages/cart";
 import Checkout from "@/pages/checkout";
 import OrderSuccess from "@/pages/order-success";
+import TrackOrder from "@/pages/track-order";
 import AdminLogin from "@/pages/admin/login";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminOrders from "@/pages/admin/orders";
@@ -60,6 +61,7 @@ function AppInner() {
           <Route path="/cart" component={() => <Cart items={items} total={total} onRemove={removeItem} onUpdateQuantity={updateQuantity} />} />
           <Route path="/checkout" component={() => <Checkout items={items} total={total} onClearCart={clearCart} />} />
           <Route path="/order-success/:id" component={OrderSuccess} />
+          <Route path="/track-order" component={TrackOrder} />
 
           {/* Admin routes */}
           <Route path="/admin">
