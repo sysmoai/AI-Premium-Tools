@@ -91,3 +91,33 @@ All routes under `/api`:
 - Orval config uses `mode: "single"` for zod output to avoid duplicate exports
 - `lib/api-zod/src/index.ts` only exports `./generated/api` (not `./generated/types`)
 - After changing OpenAPI spec, run codegen then `pnpm run typecheck:libs`
+
+## Notion Sync (Postgres → Notion)
+
+Notion is a canonical/audit mirror of the AIPT store. Postgres remains the system of record; every customer/product/order mutation is mirrored to Notion via fire-and-forget background jobs that never block API responses.
+
+- **Lib**: `lib/notion-sync` — pure upsert functions, no logger dep, uses Replit Notion connector via `@replit/connectors-sdk`.
+- **API wrapper**: `artifacts/api-server/src/services/notion-sync.ts` — adds `syncInBackground(label, fn)` that wraps the call in `void fn().catch(logger.warn)`.
+- **Hooks** (all fire-and-forget):
+  - `POST /api/customers` → `upsertCustomer`
+  - `POST /api/products`, `PUT /api/products/:id` → `upsertProduct`
+  - `DELETE /api/products/:id` → `deleteProduct` (soft-delete: sets `Active=false` in Notion, page kept so order history stays readable)
+  - `POST /api/orders`, `PATCH /api/orders/:id/status` → `upsertOrder` + `upsertCustomer` (refresh aggregate stats)
+- **Idempotency**: query Notion before insert/update.
+  - Customers: filter by `WhatsApp` (phone)
+  - Products: filter by `PG_ID` (number)
+  - Orders: filter by `Order ID = "AIPT-{id}"` (rich_text)
+- **Target Notion DBs** (hardcoded in `lib/notion-sync/src/index.ts`):
+  - Customers → `AIPT — Customers (CRM)` `31cc4f53-11fe-43ad-bfad-9419922e2412`
+  - Orders → `SYS — Orders (CANONICAL)` `ab25c567-87d8-4bb9-a04e-42b779080eaa`
+  - Products → `AIPS — Products (Catalog)` `09b32725-77f1-4289-9bc0-147b4b264539` (columns added via PATCH /v1/databases on first setup: PG_ID, Slug, Description, Price BDT, Original Price BDT, Category, Active, Featured, Order Count, Image URL, Updated At)
+- **Status mapping** (AIPT → Notion `SYS — Orders`):
+  - `pending` → Status "Payment Pending", Payment Status "Not Paid"
+  - `confirmed` → Status "Paid", Payment Status "Paid Full"
+  - `delivered` → Status "Delivered", Payment Status "Paid Full"
+  - `cancelled` → Status "Churned", Payment Status "Refunded"
+- **Payment method mapping**: `bkash`→"bKash", `nagad`→"Nagad", `bank_transfer`→"Bank Transfer"
+- **Backfill**: `pnpm --filter @workspace/scripts run backfill-notion [products|customers|orders|all]` — runs batches of 2 in parallel with 1500ms pause. Each upsert is 2 Notion calls (query + create/update), so this caps at ~1.1 req/sec total, well under Notion's 3 req/sec limit. Retries 3x with backoff.
+- **Safety guards**:
+  - `upsertCustomer` throws if phone is missing (no stable identity key → would create duplicates).
+  - All hooks wrapped in `syncInBackground` so Notion outages NEVER fail an API request.

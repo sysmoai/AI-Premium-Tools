@@ -374,6 +374,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
+      '@workspace/notion-sync':
+        specifier: workspace:*
+        version: link:../../lib/notion-sync
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -644,11 +647,24 @@ importers:
         specifier: ^0.31.9
         version: 0.31.9
 
+  lib/notion-sync:
+    dependencies:
+      '@replit/connectors-sdk':
+        specifier: ^0.4.0
+        version: 0.4.0
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.3.5
+
   scripts:
     dependencies:
       '@workspace/db':
         specifier: workspace:*
         version: link:../lib/db
+      '@workspace/notion-sync':
+        specifier: workspace:*
+        version: link:../lib/notion-sync
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/pg@8.18.0)(pg@8.20.0)

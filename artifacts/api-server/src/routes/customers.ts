@@ -4,6 +4,7 @@ import { customersTable, ordersTable } from "@workspace/db";
 import { CreateCustomerBody, GetCustomerParams } from "@workspace/api-zod";
 import { eq, sql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/admin-auth";
+import { upsertCustomer, syncInBackground } from "../services/notion-sync";
 
 const router = Router();
 
@@ -43,6 +44,17 @@ router.post("/customers", async (req, res) => {
     email: parsed.data.email ?? null,
     university: parsed.data.university ?? null,
   }).returning();
+
+  syncInBackground(`customer:${customer.id}`, () => upsertCustomer({
+    id: customer.id,
+    name: customer.name,
+    phone: customer.phone,
+    email: customer.email,
+    university: customer.university,
+    totalOrders: 0,
+    totalRevenue: 0,
+  }));
+
   res.status(201).json({ ...customer, order_count: 0, total_spent_bdt: 0, created_at: customer.createdAt.toISOString() });
 });
 

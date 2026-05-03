@@ -4,8 +4,27 @@ import { productsTable, categoriesTable } from "@workspace/db";
 import { ListProductsQueryParams, CreateProductBody, GetProductParams, UpdateProductParams, UpdateProductBody, DeleteProductParams } from "@workspace/api-zod";
 import { eq, ilike, and, sql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/admin-auth";
+import { upsertProduct, deleteProduct, syncInBackground } from "../services/notion-sync";
 
 const router = Router();
+
+function pushProductToNotion(
+  product: { id: number; name: string; description: string | null; priceBdt: string; originalPriceBdt: string | null; imageUrl: string | null; isActive: boolean; isFeatured: boolean; orderCount: number },
+  categoryName: string | null,
+): void {
+  syncInBackground(`product:${product.id}`, () => upsertProduct({
+    id: product.id,
+    name: product.name,
+    description: product.description,
+    priceBdt: Number(product.priceBdt),
+    originalPriceBdt: product.originalPriceBdt ? Number(product.originalPriceBdt) : null,
+    categoryName,
+    imageUrl: product.imageUrl,
+    isActive: product.isActive,
+    isFeatured: product.isFeatured,
+    orderCount: product.orderCount,
+  }));
+}
 
 router.get("/products", async (req, res) => {
   const parsed = ListProductsQueryParams.safeParse(req.query);
@@ -74,6 +93,7 @@ router.post("/products", requireAdmin, async (req, res) => {
   }).returning();
 
   const [cat] = await db.select({ name: categoriesTable.name }).from(categoriesTable).where(eq(categoriesTable.id, product.categoryId));
+  pushProductToNotion(product, cat?.name ?? null);
   res.status(201).json({
     ...product,
     price_bdt: Number(product.priceBdt),
@@ -142,6 +162,7 @@ router.put("/products/:id", requireAdmin, async (req, res) => {
 
   if (!product) { res.status(404).json({ error: "Not found" }); return; }
   const [cat] = await db.select({ name: categoriesTable.name }).from(categoriesTable).where(eq(categoriesTable.id, product.categoryId));
+  pushProductToNotion(product, cat?.name ?? null);
   res.json({
     ...product,
     price_bdt: Number(product.priceBdt),
@@ -155,6 +176,7 @@ router.delete("/products/:id", requireAdmin, async (req, res) => {
   const parsed = DeleteProductParams.safeParse({ id: req.params.id });
   if (!parsed.success) { res.status(400).json({ error: parsed.error }); return; }
   await db.delete(productsTable).where(eq(productsTable.id, parsed.data.id));
+  syncInBackground(`product-delete:${parsed.data.id}`, () => deleteProduct(parsed.data.id));
   res.status(204).send();
 });
 

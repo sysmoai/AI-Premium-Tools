@@ -7,10 +7,12 @@
     "hello": "tsx ./src/hello.ts",
     "seed-logos": "tsx ./src/seed-logos.ts",
     "seed-products": "tsx ./src/seed-products.ts",
+    "backfill-notion": "tsx ./src/backfill-notion.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",
+    "@workspace/notion-sync": "workspace:*",
     "drizzle-orm": "catalog:"
   },
   "devDependencies": {

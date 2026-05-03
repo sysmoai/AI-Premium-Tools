@@ -4,6 +4,52 @@ import { ordersTable, orderItemsTable, productsTable, customersTable } from "@wo
 import { ListOrdersQueryParams, CreateOrderBody, GetOrderParams, GetOrderQueryParams, UpdateOrderStatusParams, UpdateOrderStatusBody } from "@workspace/api-zod";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/admin-auth";
+import { upsertOrder, upsertCustomer, syncInBackground } from "../services/notion-sync";
+
+async function pushOrderToNotion(orderId: number): Promise<void> {
+  const full = await getOrderWithItems(orderId);
+  if (!full) return;
+  const productSummary = full.items
+    .map(i => `${i.quantity}x ${i.product_name ?? `#${i.product_id}`}`)
+    .join(", ");
+  await upsertOrder({
+    id: full.id,
+    customerName: full.customer_name,
+    customerPhone: full.customer_phone,
+    productSummary,
+    totalBdt: full.total_bdt,
+    status: full.status as "pending" | "confirmed" | "delivered" | "cancelled",
+    paymentMethod: full.payment_method as "bkash" | "nagad" | "bank_transfer",
+    paymentRef: full.payment_ref,
+    notes: full.notes,
+    createdAt: new Date(full.created_at ?? Date.now()),
+  });
+}
+
+async function pushCustomerStatsToNotion(customerId: number): Promise<void> {
+  const [c] = await db.select().from(customersTable).where(eq(customersTable.id, customerId));
+  if (!c) return;
+  const [stats] = await db
+    .select({
+      total_orders: sql<number>`cast(count(${ordersTable.id}) as int)`,
+      total_revenue: sql<number>`cast(coalesce(sum(${ordersTable.totalBdt}), 0) as float)`,
+      first_order_at: sql<Date | null>`min(${ordersTable.createdAt})`,
+      last_order_at: sql<Date | null>`max(${ordersTable.createdAt})`,
+    })
+    .from(ordersTable)
+    .where(eq(ordersTable.customerId, customerId));
+  await upsertCustomer({
+    id: c.id,
+    name: c.name,
+    phone: c.phone,
+    email: c.email,
+    university: c.university,
+    totalOrders: stats?.total_orders ?? 0,
+    totalRevenue: stats?.total_revenue ?? 0,
+    firstOrderAt: stats?.first_order_at ? new Date(stats.first_order_at) : null,
+    lastOrderAt: stats?.last_order_at ? new Date(stats.last_order_at) : null,
+  });
+}
 
 const router = Router();
 
@@ -161,6 +207,12 @@ router.post("/orders", async (req, res) => {
   // The customer just placed this order — they're allowed to see all of its
   // PII fields (phone, payment ref, notes) on the order-success screen.
   const result = await getOrderWithItems(order.id);
+
+  syncInBackground(`order:${order.id}`, async () => {
+    await pushOrderToNotion(order.id);
+    await pushCustomerStatsToNotion(customer_id);
+  });
+
   res.status(201).json(result);
 });
 
@@ -199,6 +251,12 @@ router.patch("/orders/:id/status", requireAdmin, async (req, res) => {
   const [order] = await db.update(ordersTable).set({ status: bodyParsed.data.status }).where(eq(ordersTable.id, paramsParsed.data.id)).returning();
   if (!order) { res.status(404).json({ error: "Not found" }); return; }
   const result = await getOrderWithItems(order.id);
+
+  syncInBackground(`order-status:${order.id}`, async () => {
+    await pushOrderToNotion(order.id);
+    await pushCustomerStatsToNotion(order.customerId);
+  });
+
   res.json(result);
 });
 
