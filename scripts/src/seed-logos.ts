@@ -5,46 +5,40 @@
  * This script ONLY updates image_url — it never modifies name, price,
  * category, or any other field.  Safe to run multiple times (idempotent).
  *
- * Logo URL strategy:
- *   - Clearbit Logo API  → https://logo.clearbit.com/<domain>
- *   - Wikimedia Commons  → fallback for tools not indexed by Clearbit
+ * Logo source: locally-bundled SVG/PNG assets in
+ *   artifacts/aipt-store/public/logos/
+ *
+ * Brands without a bundled logo (Canva, Adobe Creative Cloud, Runway,
+ * Leonardo, Ideogram, HeyGen, x.ai, Udio, Manus, Otter, Gamma,
+ * Writesonic, Lindy, plus all multi-product packages) are intentionally
+ * left as NULL so the ProductLogoBanner gradient + initial-letter
+ * fallback renders cleanly instead of attempting a broken request.
  *
  * Run:  pnpm --filter @workspace/scripts run seed-logos
  */
 
 import { db, productsTable } from "@workspace/db";
-import { ilike, isNull, or } from "drizzle-orm";
+import { ilike } from "drizzle-orm";
 
 const LOGO_MAP: Array<{ namePattern: string; imageUrl: string }> = [
-  { namePattern: "ChatGPT%", imageUrl: "https://logo.clearbit.com/openai.com" },
-  { namePattern: "Claude%", imageUrl: "https://logo.clearbit.com/anthropic.com" },
-  { namePattern: "Gemini%", imageUrl: "https://logo.clearbit.com/gemini.google.com" },
-  { namePattern: "Perplexity%", imageUrl: "https://logo.clearbit.com/perplexity.ai" },
-  { namePattern: "Midjourney%", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/e/e6/Midjourney_Emblem.png" },
-  { namePattern: "Canva%", imageUrl: "https://logo.clearbit.com/canva.com" },
-  { namePattern: "Adobe%", imageUrl: "https://logo.clearbit.com/adobe.com" },
-  { namePattern: "Leonardo%", imageUrl: "https://logo.clearbit.com/leonardo.ai" },
-  { namePattern: "Ideogram%", imageUrl: "https://logo.clearbit.com/ideogram.ai" },
-  { namePattern: "Notion%", imageUrl: "https://logo.clearbit.com/notion.so" },
-  { namePattern: "Grammarly%", imageUrl: "https://logo.clearbit.com/grammarly.com" },
-  { namePattern: "Runway%", imageUrl: "https://logo.clearbit.com/runwayml.com" },
-  { namePattern: "ElevenLabs%", imageUrl: "https://logo.clearbit.com/elevenlabs.io" },
-  { namePattern: "HeyGen%", imageUrl: "https://logo.clearbit.com/heygen.com" },
-  { namePattern: "GitHub Copilot%", imageUrl: "https://logo.clearbit.com/github.com" },
-  { namePattern: "Cursor%", imageUrl: "https://logo.clearbit.com/cursor.com" },
-  { namePattern: "SuperGrok%", imageUrl: "https://logo.clearbit.com/x.ai" },
-  { namePattern: "Suno%", imageUrl: "https://logo.clearbit.com/suno.com" },
-  { namePattern: "Udio%", imageUrl: "https://logo.clearbit.com/udio.com" },
-  { namePattern: "v0.dev%", imageUrl: "https://logo.clearbit.com/v0.dev" },
-  { namePattern: "Replit%", imageUrl: "https://logo.clearbit.com/replit.com" },
-  { namePattern: "Manus%", imageUrl: "https://logo.clearbit.com/manus.im" },
-  { namePattern: "Otter%", imageUrl: "https://logo.clearbit.com/otter.ai" },
-  { namePattern: "Gamma%", imageUrl: "https://logo.clearbit.com/gamma.app" },
-  { namePattern: "Writesonic%", imageUrl: "https://logo.clearbit.com/writesonic.com" },
-  { namePattern: "Make.com%", imageUrl: "https://logo.clearbit.com/make.com" },
-  { namePattern: "Zapier%", imageUrl: "https://logo.clearbit.com/zapier.com" },
-  { namePattern: "n8n%", imageUrl: "https://logo.clearbit.com/n8n.io" },
-  { namePattern: "Lindy%", imageUrl: "https://logo.clearbit.com/lindy.ai" },
+  { namePattern: "ChatGPT%", imageUrl: "/logos/openai.svg" },
+  { namePattern: "Claude%", imageUrl: "/logos/anthropic.svg" },
+  { namePattern: "Gemini%", imageUrl: "/logos/google_gemini.svg" },
+  { namePattern: "Google AI%", imageUrl: "/logos/google_gemini.svg" },
+  { namePattern: "Perplexity%", imageUrl: "/logos/perplexity.svg" },
+  { namePattern: "Midjourney%", imageUrl: "/logos/midjourney.png" },
+  { namePattern: "Adobe%", imageUrl: "/logos/adobe.png" },
+  { namePattern: "Notion%", imageUrl: "/logos/notion.svg" },
+  { namePattern: "Grammarly%", imageUrl: "/logos/grammarly.svg" },
+  { namePattern: "ElevenLabs%", imageUrl: "/logos/elevenlabs.svg" },
+  { namePattern: "GitHub Copilot%", imageUrl: "/logos/github.svg" },
+  { namePattern: "Cursor%", imageUrl: "/logos/cursor.svg" },
+  { namePattern: "Suno%", imageUrl: "/logos/suno.svg" },
+  { namePattern: "v0.dev%", imageUrl: "/logos/vercel.svg" },
+  { namePattern: "Replit%", imageUrl: "/logos/replit.svg" },
+  { namePattern: "Make.com%", imageUrl: "/logos/make.svg" },
+  { namePattern: "Zapier%", imageUrl: "/logos/zapier.svg" },
+  { namePattern: "n8n%", imageUrl: "/logos/n8n.svg" },
 ];
 
 async function main() {

@@ -8,6 +8,7 @@ export interface SeoOptions {
   canonical?: string;
   jsonLd?: Record<string, unknown> | Array<Record<string, unknown>> | null;
   keywords?: string;
+  noindex?: boolean;
 }
 
 const SITE_NAME = "AIPT — AI Premium Tools";
@@ -34,10 +35,17 @@ function setLink(rel: string, href: string) {
 
 const JSON_LD_ID = "aipt-jsonld";
 
-export function useSeo({ title, description, image, type = "website", canonical, jsonLd, keywords }: SeoOptions) {
+export function useSeo({ title, description, image, type = "website", canonical, jsonLd, keywords, noindex }: SeoOptions) {
   useEffect(() => {
     const fullTitle = title.includes("AIPT") ? title : `${title} | ${SITE_NAME}`;
     document.title = fullTitle;
+
+    setMeta(
+      'meta[name="robots"]',
+      "name",
+      "robots",
+      noindex ? "noindex,nofollow" : "index,follow,max-image-preview:large",
+    );
 
     if (description) {
       setMeta('meta[name="description"]', "name", "description", description);
@@ -82,5 +90,5 @@ export function useSeo({ title, description, image, type = "website", canonical,
       const s = document.getElementById(JSON_LD_ID);
       if (s) s.remove();
     };
-  }, [title, description, image, type, canonical, keywords, JSON.stringify(jsonLd)]);
+  }, [title, description, image, type, canonical, keywords, noindex, JSON.stringify(jsonLd)]);
 }

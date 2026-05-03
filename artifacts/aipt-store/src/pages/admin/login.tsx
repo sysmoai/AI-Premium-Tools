@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useSeo } from "@/hooks/use-seo";
 import { adminLogin } from "@workspace/api-client-react";
 
 interface AdminLoginProps {
@@ -22,6 +23,8 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
+
+  useSeo({ title: "Admin Login | AIPT", noindex: true });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -130,6 +133,17 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Hidden username field for accessibility / password manager hints */}
+            <input
+              type="text"
+              name="username"
+              autoComplete="username"
+              value="admin"
+              readOnly
+              aria-hidden="true"
+              tabIndex={-1}
+              style={{ position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0,0,0,0)", whiteSpace: "nowrap", border: 0 }}
+            />
             <div className="space-y-2">
               <Label htmlFor="password" className="text-sm font-medium">Admin Password</Label>
               <Input

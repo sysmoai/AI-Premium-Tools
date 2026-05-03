@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useListOrders, useUpdateOrderStatus } from "@workspace/api-client-react";
 import type { ListOrdersStatus, Order } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useSeo } from "@/hooks/use-seo";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-700",
@@ -21,6 +22,7 @@ const STATUS_COLORS: Record<string, string> = {
 const PAGE_SIZE = 10;
 
 export default function AdminOrders() {
+  useSeo({ title: "Admin Orders | AIPT", noindex: true });
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);

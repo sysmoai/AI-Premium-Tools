@@ -7,10 +7,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useListCustomers } from "@workspace/api-client-react";
+import { useSeo } from "@/hooks/use-seo";
 
 const PAGE_SIZE = 10;
 
 export default function AdminCustomers() {
+  useSeo({ title: "Admin Customers | AIPT", noindex: true });
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
 

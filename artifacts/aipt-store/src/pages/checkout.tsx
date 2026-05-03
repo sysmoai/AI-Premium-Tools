@@ -237,7 +237,7 @@ export default function Checkout({ items, total, onClearCart }: CheckoutProps) {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email (optional)</Label>
-                    <Input id="email" type="email" value={form.email} onChange={e => updateForm("email", e.target.value)} placeholder="you@example.com" data-testid="input-email" />
+                    <Input id="email" type="email" value={form.email} onChange={e => updateForm("email", e.target.value)} placeholder="you@gmail.com" data-testid="input-email" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="university">University (optional)</Label>

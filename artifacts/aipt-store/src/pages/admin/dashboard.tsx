@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useGetDashboardStats, useListOrders } from "@workspace/api-client-react";
+import { useSeo } from "@/hooks/use-seo";
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -57,6 +58,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
+  useSeo({ title: "Admin Dashboard | AIPT", noindex: true });
   const { data: stats, isLoading: statsLoading } = useGetDashboardStats();
   const { data: recentOrders, isLoading: ordersLoading } = useListOrders();
 

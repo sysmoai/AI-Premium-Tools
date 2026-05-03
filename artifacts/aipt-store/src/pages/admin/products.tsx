@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import { useListProducts, useCreateProduct, useUpdateProduct, useListCategories } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useSeo } from "@/hooks/use-seo";
 
 interface ProductForm {
   name: string;
@@ -32,6 +33,7 @@ const emptyForm: ProductForm = {
 };
 
 export default function AdminProducts() {
+  useSeo({ title: "Admin Products | AIPT", noindex: true });
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
