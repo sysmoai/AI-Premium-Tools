@@ -142,7 +142,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
 
         {/* Right column: Purchase card */}
         <div>
-          <Card className="sticky top-6" style={{ border: "2px solid hsl(var(--primary) / 0.2)", boxShadow: "0 8px 30px hsl(var(--primary) / 0.1)" }}>
+          <Card className="md:sticky md:top-6" style={{ border: "2px solid hsl(var(--primary) / 0.2)", boxShadow: "0 8px 30px hsl(var(--primary) / 0.1)" }}>
             <CardContent className="p-7">
               {/* Price block */}
               <div className="mb-6 pb-5 border-b border-border">

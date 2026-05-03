@@ -67,18 +67,68 @@ export default function Cart({ items, total, onRemove, onUpdateQuantity }: CartP
               <Card key={item.productId} data-testid={`card-cart-item-${item.productId}`} className="overflow-hidden">
                 <CardContent className="p-0 flex items-stretch">
                   {/* Color strip */}
-                  <div className={`w-14 bg-gradient-to-b ${gradient} flex items-center justify-center flex-shrink-0`}>
-                    <span className="text-xl font-black text-white" style={{ fontFamily: "Outfit, sans-serif" }}>{initial}</span>
+                  <div className={`w-12 md:w-14 bg-gradient-to-b ${gradient} flex items-center justify-center flex-shrink-0`}>
+                    <span className="text-lg md:text-xl font-black text-white" style={{ fontFamily: "Outfit, sans-serif" }}>{initial}</span>
                   </div>
 
-                  <div className="flex-1 p-4 flex items-center gap-4">
+                  {/* Mobile layout: stacked rows */}
+                  <div className="flex-1 p-3 md:hidden">
+                    {/* Top row: name info + remove */}
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="min-w-0">
+                        <div className="font-semibold truncate text-sm">{item.name}</div>
+                        <div className="text-xs text-muted-foreground">{item.duration_days || 30} days access</div>
+                        <div className="text-primary font-bold text-sm mt-0.5">৳{item.price_bdt} each</div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 text-muted-foreground hover:text-destructive shrink-0 -mt-1 -mr-1"
+                        onClick={() => onRemove(item.productId)}
+                        data-testid={`btn-remove-${item.productId}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {/* Bottom row: stepper + subtotal */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-11 w-11 rounded-lg touch-manipulation"
+                          onClick={() => onUpdateQuantity(item.productId, item.quantity - 1)}
+                          data-testid={`btn-decrease-${item.productId}`}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <span className="w-8 text-center font-bold text-base" data-testid={`text-quantity-${item.productId}`}>
+                          {item.quantity}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-11 w-11 rounded-lg touch-manipulation"
+                          onClick={() => onUpdateQuantity(item.productId, item.quantity + 1)}
+                          data-testid={`btn-increase-${item.productId}`}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="font-black text-lg text-primary" style={{ fontFamily: "Outfit, sans-serif" }}>
+                        ৳{(item.price_bdt * item.quantity).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Desktop layout: single row */}
+                  <div className="hidden md:flex flex-1 p-4 items-center gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold truncate">{item.name}</div>
                       <div className="text-sm text-muted-foreground">{item.duration_days || 30} days access</div>
                       <div className="text-primary font-bold text-base mt-0.5">৳{item.price_bdt} × {item.quantity}</div>
                     </div>
 
-                    {/* Quantity stepper */}
                     <div className="flex items-center gap-1.5 shrink-0">
                       <Button
                         variant="outline"
@@ -103,7 +153,6 @@ export default function Cart({ items, total, onRemove, onUpdateQuantity }: CartP
                       </Button>
                     </div>
 
-                    {/* Subtotal */}
                     <div className="text-right min-w-20 shrink-0">
                       <div className="font-black text-lg text-primary" style={{ fontFamily: "Outfit, sans-serif" }}>
                         ৳{(item.price_bdt * item.quantity).toLocaleString()}
@@ -134,7 +183,7 @@ export default function Cart({ items, total, onRemove, onUpdateQuantity }: CartP
 
         {/* Order summary sidebar */}
         <div>
-          <Card className="sticky top-6" style={{ boxShadow: "0 4px 20px hsl(var(--primary) / 0.08)" }}>
+          <Card className="md:sticky md:top-6" style={{ boxShadow: "0 4px 20px hsl(var(--primary) / 0.08)" }}>
             <CardContent className="p-6">
               <h2 className="font-bold text-xl mb-6 flex items-center gap-2">
                 <Tag className="h-5 w-5 text-primary" />

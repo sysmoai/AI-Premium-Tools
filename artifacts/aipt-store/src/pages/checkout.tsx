@@ -138,12 +138,12 @@ export default function Checkout({ items, total, onClearCart }: CheckoutProps) {
       </Link>
 
       {/* 3-step progress indicator */}
-      <div className="flex items-center justify-center mb-10 max-w-sm mx-auto">
+      <div className="flex items-center justify-center mb-8 w-full max-w-xs mx-auto px-2">
         {STEPS.map((step, idx) => (
           <div key={step.label} className="flex items-center flex-1">
-            <div className="flex flex-col items-center gap-1.5">
+            <div className="flex flex-col items-center gap-1">
               <div
-                className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                className={`h-8 w-8 rounded-full flex items-center justify-center font-bold transition-all ${
                   idx === 0
                     ? "bg-muted text-muted-foreground"
                     : idx === 1
@@ -152,15 +152,15 @@ export default function Checkout({ items, total, onClearCart }: CheckoutProps) {
                 }`}
                 style={idx === 1 ? { background: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary)))" } : {}}
               >
-                {step.icon}
+                <span className="w-4 h-4 flex items-center justify-center [&>svg]:w-3.5 [&>svg]:h-3.5">{step.icon}</span>
               </div>
-              <span className={`text-xs font-medium ${idx === 1 ? "text-primary" : "text-muted-foreground"}`}>
+              <span className={`text-[11px] font-medium leading-none ${idx === 1 ? "text-primary" : "text-muted-foreground"}`}>
                 {step.label}
               </span>
             </div>
             {idx < STEPS.length - 1 && (
               <div
-                className="flex-1 h-0.5 mx-2 mb-5 rounded-full"
+                className="flex-1 h-0.5 mx-1.5 mb-4 rounded-full"
                 style={{
                   background: idx === 0
                     ? "linear-gradient(90deg, hsl(var(--muted)), hsl(var(--primary) / 0.4))"
@@ -212,7 +212,7 @@ export default function Checkout({ items, total, onClearCart }: CheckoutProps) {
                       key={pm.id}
                       type="button"
                       onClick={() => setPaymentMethod(pm.id as typeof paymentMethod)}
-                      className={`flex flex-col items-center justify-center gap-2 p-4 rounded-lg border-2 font-medium text-sm transition-all ${
+                      className={`flex flex-col items-center justify-center gap-2 py-4 px-2 min-h-[72px] rounded-lg border-2 font-medium text-sm transition-all touch-manipulation ${
                         paymentMethod === pm.id ? pm.activeTint : "border-border hover:border-primary/30"
                       }`}
                       data-testid={`btn-payment-${pm.id}`}
@@ -282,7 +282,7 @@ export default function Checkout({ items, total, onClearCart }: CheckoutProps) {
 
           {/* Summary */}
           <div>
-            <Card className="sticky top-6" style={{ boxShadow: "0 4px 20px hsl(var(--primary) / 0.08)" }}>
+            <Card className="md:sticky md:top-6" style={{ boxShadow: "0 4px 20px hsl(var(--primary) / 0.08)" }}>
               <CardContent className="p-6">
                 <h2 className="font-bold text-xl mb-6">Order Summary</h2>
                 <div className="space-y-3 mb-4">
