@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateCustomer, useCreateOrder } from "@workspace/api-client-react";
 import type { CartItem } from "@/hooks/use-cart";
+import { BKASH_NUMBER, NAGAD_NUMBER, BANK_INFO } from "@/config/contact";
 
 interface CheckoutProps {
   items: CartItem[];
@@ -22,7 +23,7 @@ const PAYMENT_METHODS = [
     id: "bkash",
     label: "bKash",
     icon: <Smartphone className="h-5 w-5" />,
-    number: "01XXXXXXXXX",
+    number: BKASH_NUMBER,
     tint: "border-pink-400 bg-pink-50 dark:bg-pink-950/20",
     activeTint: "border-pink-500 bg-pink-50 dark:bg-pink-900/30 shadow-md shadow-pink-100 dark:shadow-pink-900/10",
     labelColor: "text-pink-700 dark:text-pink-400",
@@ -33,7 +34,7 @@ const PAYMENT_METHODS = [
     id: "nagad",
     label: "Nagad",
     icon: <Smartphone className="h-5 w-5" />,
-    number: "01XXXXXXXXX",
+    number: NAGAD_NUMBER,
     tint: "border-orange-400 bg-orange-50 dark:bg-orange-950/20",
     activeTint: "border-orange-500 bg-orange-50 dark:bg-orange-900/30 shadow-md shadow-orange-100 dark:shadow-orange-900/10",
     labelColor: "text-orange-700 dark:text-orange-400",
@@ -44,7 +45,7 @@ const PAYMENT_METHODS = [
     id: "bank_transfer",
     label: "Bank Transfer",
     icon: <Building className="h-5 w-5" />,
-    number: "Dutch-Bangla Bank",
+    number: BANK_INFO,
     tint: "border-blue-400 bg-blue-50 dark:bg-blue-950/20",
     activeTint: "border-blue-500 bg-blue-50 dark:bg-blue-900/30 shadow-md shadow-blue-100 dark:shadow-blue-900/10",
     labelColor: "text-blue-700 dark:text-blue-400",

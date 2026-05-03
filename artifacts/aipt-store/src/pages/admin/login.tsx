@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Lock, Sparkles, Shield, Zap, Users } from "lucide-react";
+import { Lock, Sparkles, Shield, Zap, Users, MessageCircle } from "lucide-react";
+import { WHATSAPP_URL } from "@/config/contact";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -138,7 +139,16 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
           </form>
 
           <p className="text-center text-xs text-muted-foreground mt-6">
-            Need help? Contact support via WhatsApp
+            Need help?{" "}
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 font-medium text-green-600 hover:text-green-700 transition-colors"
+            >
+              <MessageCircle className="h-3 w-3" />
+              Contact support via WhatsApp
+            </a>
           </p>
         </div>
       </div>
