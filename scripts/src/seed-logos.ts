@@ -16,39 +16,22 @@ import { db, productsTable } from "@workspace/db";
 import { ilike, isNull, or } from "drizzle-orm";
 
 const LOGO_MAP: Array<{ namePattern: string; imageUrl: string }> = [
-  {
-    namePattern: "ChatGPT%",
-    imageUrl: "https://logo.clearbit.com/openai.com",
-  },
-  {
-    namePattern: "Claude%",
-    imageUrl: "https://logo.clearbit.com/anthropic.com",
-  },
-  {
-    namePattern: "Midjourney%",
-    imageUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/e/e6/Midjourney_Emblem.png",
-  },
-  {
-    namePattern: "Canva%",
-    imageUrl: "https://logo.clearbit.com/canva.com",
-  },
-  {
-    namePattern: "Notion%",
-    imageUrl: "https://logo.clearbit.com/notion.so",
-  },
-  {
-    namePattern: "Grammarly%",
-    imageUrl: "https://logo.clearbit.com/grammarly.com",
-  },
-  {
-    namePattern: "Runway%",
-    imageUrl: "https://logo.clearbit.com/runwayml.com",
-  },
-  {
-    namePattern: "ElevenLabs%",
-    imageUrl: "https://logo.clearbit.com/elevenlabs.io",
-  },
+  { namePattern: "ChatGPT%", imageUrl: "https://logo.clearbit.com/openai.com" },
+  { namePattern: "Claude%", imageUrl: "https://logo.clearbit.com/anthropic.com" },
+  { namePattern: "Gemini%", imageUrl: "https://logo.clearbit.com/gemini.google.com" },
+  { namePattern: "Perplexity%", imageUrl: "https://logo.clearbit.com/perplexity.ai" },
+  { namePattern: "Midjourney%", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/e/e6/Midjourney_Emblem.png" },
+  { namePattern: "Canva%", imageUrl: "https://logo.clearbit.com/canva.com" },
+  { namePattern: "Adobe%", imageUrl: "https://logo.clearbit.com/adobe.com" },
+  { namePattern: "Leonardo%", imageUrl: "https://logo.clearbit.com/leonardo.ai" },
+  { namePattern: "Ideogram%", imageUrl: "https://logo.clearbit.com/ideogram.ai" },
+  { namePattern: "Notion%", imageUrl: "https://logo.clearbit.com/notion.so" },
+  { namePattern: "Grammarly%", imageUrl: "https://logo.clearbit.com/grammarly.com" },
+  { namePattern: "Runway%", imageUrl: "https://logo.clearbit.com/runwayml.com" },
+  { namePattern: "ElevenLabs%", imageUrl: "https://logo.clearbit.com/elevenlabs.io" },
+  { namePattern: "HeyGen%", imageUrl: "https://logo.clearbit.com/heygen.com" },
+  { namePattern: "GitHub Copilot%", imageUrl: "https://logo.clearbit.com/github.com" },
+  { namePattern: "Cursor%", imageUrl: "https://logo.clearbit.com/cursor.com" },
 ];
 
 async function main() {

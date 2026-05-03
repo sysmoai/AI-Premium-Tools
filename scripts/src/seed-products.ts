@@ -3,30 +3,15 @@
  *
  * Authoritative product catalog for the AIPT store.
  *
- * This script is the single source of truth for product definitions.
- * It uses INSERT … ON CONFLICT DO UPDATE (upsert) so it is safe to run
- * multiple times without creating duplicates.
- *
- * Pricing policy: AIPT sells premium AI subscriptions at ~20% below
- * the standard retail price.  Each product's price_bdt therefore equals
- * round(original_price_bdt × 0.80).  Any future price change should be
- * applied here first, then re-run this script.
+ * 29 products total: 18 core AI tools + 11 student/freelancer bundles.
+ * All pricing follows AIPT positioning: student-friendly, ~15-20% below
+ * standard market rates, with shared/personal/key tiers where applicable.
  *
  * Run:  pnpm --filter @workspace/scripts run seed-products
  */
 
 import { db, productsTable, categoriesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
-import { sql } from "drizzle-orm";
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/** Round to nearest 10 BDT — keeps prices looking clean in the UI */
-function discounted(original: number, pct = 0.2): number {
-  return Math.round((original * (1 - pct)) / 10) * 10;
-}
-
-// ── Category lookup ───────────────────────────────────────────────────────────
+import { eq, sql } from "drizzle-orm";
 
 async function getCategoryId(slug: string): Promise<number> {
   const [row] = await db
@@ -37,10 +22,8 @@ async function getCategoryId(slug: string): Promise<number> {
   return row.id;
 }
 
-// ── Product definitions ───────────────────────────────────────────────────────
-
 async function main() {
-  console.log("Seeding product catalog...\n");
+  console.log("Seeding AIPT product catalog (29 products)...\n");
 
   const aiText = await getCategoryId("ai-text");
   const aiImage = await getCategoryId("ai-image");
@@ -48,352 +31,494 @@ async function main() {
   const aiVideo = await getCategoryId("ai-video");
   const studentPkg = await getCategoryId("student-packages");
   const freelancerPkg = await getCategoryId("freelancer-packages");
+  const aiCode = await getCategoryId("ai-code");
+  const aiAutomation = await getCategoryId("ai-automation");
 
   const products = [
-    // ── AI Text & Writing ─────────────────────────────────────────────────────
+    // ── AI Text & Writing (6) ─────────────────────────────────────────────────
     {
       id: 1,
       name: "ChatGPT Plus Shared",
       description:
-        "Access ChatGPT Plus (GPT-4) at a fraction of the cost. Perfect for students who need powerful AI writing and research assistance.",
-      originalPriceBdt: "599",
-      priceBdt: String(discounted(599)),
-      categoryId: aiText,
-      imageUrl: "https://logo.clearbit.com/openai.com",
+        "Access ChatGPT Plus (GPT-4o + GPT-5) at a fraction of the cost. Perfect for students who need powerful AI writing, research, and study help.",
+      originalPriceBdt: "1990", priceBdt: "499",
+      categoryId: aiText, imageUrl: "https://logo.clearbit.com/openai.com",
       features: [
-        "GPT-4 access",
-        "Image generation with DALL-E",
-        "Web browsing",
+        "GPT-4o + GPT-5 access",
+        "DALL-E image generation",
+        "Web browsing & file uploads",
         "Advanced data analysis",
-        "40 messages per 3 hours",
-        "Shared account",
+        "Shared seat — login alternates",
+        "30-day warranty",
       ],
-      durationDays: 30,
-      isFeatured: true,
-      isActive: true,
-      stockCount: 100,
+      durationDays: 30, isFeatured: true, isActive: true, stockCount: 100,
     },
     {
       id: 2,
-      name: "ChatGPT Plus Solo",
+      name: "ChatGPT Plus Personal",
       description:
-        "Dedicated ChatGPT Plus account. Full private access to GPT-4 with no sharing — ideal for heavy daily users.",
-      originalPriceBdt: "1599",
-      priceBdt: String(discounted(1599)),
-      categoryId: aiText,
-      imageUrl: "https://logo.clearbit.com/openai.com",
+        "Your own private ChatGPT Plus account. Full access to GPT-5, custom GPTs, and unlimited tools. Ideal for daily power users.",
+      originalPriceBdt: "2400", priceBdt: "1390",
+      categoryId: aiText, imageUrl: "https://logo.clearbit.com/openai.com",
       features: [
         "Dedicated private account",
-        "GPT-4 unlimited",
-        "Custom GPTs",
+        "GPT-5 unlimited",
+        "Custom GPTs & GPT Store",
         "DALL-E image generation",
-        "Code interpreter",
-        "No sharing",
+        "Code Interpreter",
+        "Email + password delivery",
       ],
-      durationDays: 30,
-      isFeatured: false,
-      isActive: true,
-      stockCount: 100,
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 50,
     },
     {
       id: 3,
       name: "Claude Pro Shared",
       description:
-        "Access Claude Pro — Anthropic's powerful AI assistant known for long context and nuanced writing. Great for essays and research.",
-      originalPriceBdt: "799",
-      priceBdt: String(discounted(799)),
-      categoryId: aiText,
-      imageUrl: "https://logo.clearbit.com/anthropic.com",
+        "Claude Pro by Anthropic — Bangladesh students' favourite for long essays, thesis drafts, and document analysis with 200K context.",
+      originalPriceBdt: "2350", priceBdt: "699",
+      categoryId: aiText, imageUrl: "https://logo.clearbit.com/anthropic.com",
       features: [
-        "Claude 3 Opus & Sonnet access",
-        "200K token context window",
+        "Claude 4 Sonnet & Opus",
+        "200K-token context window",
         "Priority access during peak hours",
-        "Shared account",
-        "Document analysis",
-        "Code generation",
+        "Document & PDF analysis",
+        "Projects & Artifacts",
+        "Shared seat",
       ],
-      durationDays: 30,
-      isFeatured: true,
-      isActive: true,
-      stockCount: 100,
+      durationDays: 30, isFeatured: true, isActive: true, stockCount: 100,
     },
-
-    // ── AI Image & Design ─────────────────────────────────────────────────────
     {
       id: 4,
-      name: "Midjourney Shared",
+      name: "Claude Pro Personal",
       description:
-        "Generate stunning AI images with Midjourney. Access one of the world's best AI image generation tools at student-friendly prices.",
-      originalPriceBdt: "1199",
-      priceBdt: String(discounted(1199)),
-      categoryId: aiImage,
-      imageUrl:
-        "https://upload.wikimedia.org/wikipedia/commons/e/e6/Midjourney_Emblem.png",
+        "Private Claude Pro account — uninterrupted access for heavy academic, legal, and writing workflows.",
+      originalPriceBdt: "2350", priceBdt: "1690",
+      categoryId: aiText, imageUrl: "https://logo.clearbit.com/anthropic.com",
       features: [
-        "Midjourney v6 access",
-        "~200 image generations/month",
-        "All artistic styles",
-        "Upscaling & variations",
-        "Shared account",
-        "Commercial use",
+        "Dedicated personal account",
+        "Claude 4 Opus access",
+        "200K context",
+        "Projects & MCP support",
+        "Email + password delivery",
+        "30-day warranty",
       ],
-      durationDays: 30,
-      isFeatured: true,
-      isActive: true,
-      stockCount: 100,
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 40,
     },
     {
       id: 5,
-      name: "Canva Pro",
+      name: "Gemini Advanced (Google AI Pro)",
       description:
-        "Unlock Canva Pro with premium templates, brand kit, background remover, and AI design tools. Essential for student presentations and projects.",
-      originalPriceBdt: "499",
-      priceBdt: String(discounted(499)),
-      categoryId: aiImage,
-      imageUrl: "https://logo.clearbit.com/canva.com",
+        "Google's flagship AI with Gemini 2.5 Pro, Veo video, and 2 TB Drive. Pairs perfectly with Gmail, Docs, and YouTube.",
+      originalPriceBdt: "2200", priceBdt: "599",
+      categoryId: aiText, imageUrl: "https://logo.clearbit.com/gemini.google.com",
       features: [
-        "100+ million premium templates",
-        "Background remover",
-        "Brand Kit",
-        "Magic Resize",
-        "AI image generator",
-        "100GB cloud storage",
+        "Gemini 2.5 Pro",
+        "Veo video generation",
+        "Deep Research mode",
+        "2 TB Google Drive included",
+        "NotebookLM Plus",
+        "Shared seat",
       ],
-      durationDays: 30,
-      isFeatured: false,
-      isActive: true,
-      stockCount: 100,
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 80,
     },
-
-    // ── AI Productivity ───────────────────────────────────────────────────────
     {
       id: 6,
-      name: "Notion AI Add-on",
+      name: "Perplexity Pro",
       description:
-        "Add AI superpowers to your Notion workspace. Summarize, write, and brainstorm without leaving your notes.",
-      originalPriceBdt: "429",
-      priceBdt: String(discounted(429)),
-      categoryId: aiProductivity,
-      imageUrl: "https://logo.clearbit.com/notion.so",
+        "AI-powered research engine with cited sources. Replaces 10 Google tabs — ideal for assignments and fact-checking.",
+      originalPriceBdt: "1990", priceBdt: "390",
+      categoryId: aiText, imageUrl: "https://logo.clearbit.com/perplexity.ai",
       features: [
-        "AI writing assistant",
-        "Summarize long documents",
-        "Action item extraction",
-        "Translation to 10+ languages",
-        "Q&A on your notes",
-        "Works on any Notion plan",
+        "GPT-5, Claude 4, Gemini 2.5 inside",
+        "Unlimited Pro searches",
+        "File uploads & analysis",
+        "Image generation included",
+        "Cited, source-linked answers",
+        "1-year codes available on request",
       ],
-      durationDays: 30,
-      isFeatured: false,
-      isActive: true,
-      stockCount: 100,
-    },
-    {
-      id: 7,
-      name: "Grammarly Premium",
-      description:
-        "Write better in English with Grammarly Premium. Catch grammar errors, improve clarity, and match the perfect tone for academic writing.",
-      originalPriceBdt: "369",
-      priceBdt: String(discounted(369)),
-      categoryId: aiProductivity,
-      imageUrl: "https://logo.clearbit.com/grammarly.com",
-      features: [
-        "Advanced grammar & spell check",
-        "Tone detection",
-        "Clarity suggestions",
-        "Plagiarism detection",
-        "Citation suggestions",
-        "Works everywhere online",
-      ],
-      durationDays: 30,
-      isFeatured: false,
-      isActive: true,
-      stockCount: 100,
+      durationDays: 30, isFeatured: true, isActive: true, stockCount: 100,
     },
 
-    // ── AI Video & Audio ──────────────────────────────────────────────────────
+    // ── AI Image & Design (5) ─────────────────────────────────────────────────
+    {
+      id: 7,
+      name: "Midjourney Basic Shared",
+      description:
+        "World-class AI art generation. Create stunning visuals for projects, presentations, social posts, and freelance gigs.",
+      originalPriceBdt: "1490", priceBdt: "999",
+      categoryId: aiImage,
+      imageUrl: "https://upload.wikimedia.org/wikipedia/commons/e/e6/Midjourney_Emblem.png",
+      features: [
+        "Midjourney v7 access",
+        "~200 fast generations/month",
+        "All artistic styles & references",
+        "Upscaling & variations",
+        "Shared Discord seat",
+        "Commercial-use rights",
+      ],
+      durationDays: 30, isFeatured: true, isActive: true, stockCount: 60,
+    },
     {
       id: 8,
-      name: "Runway Gen-3",
+      name: "Canva Pro",
       description:
-        "Create and edit professional AI videos. Runway is the go-to AI video tool for creators and filmmakers.",
-      originalPriceBdt: "1799",
-      priceBdt: String(discounted(1799)),
-      categoryId: aiVideo,
-      imageUrl: "https://logo.clearbit.com/runwayml.com",
+        "Premium templates, brand kit, background remover, AI image and video generation — the must-have design app for students.",
+      originalPriceBdt: "490", priceBdt: "199",
+      categoryId: aiImage, imageUrl: "https://logo.clearbit.com/canva.com",
       features: [
-        "Gen-3 video generation",
-        "125 credits/month",
-        "Text-to-video",
-        "Image-to-video",
-        "Video inpainting",
-        "Slow motion & upscaling",
+        "100M+ premium templates",
+        "Magic Studio AI tools",
+        "Background remover",
+        "Brand Kit & Magic Resize",
+        "100 GB cloud storage",
+        "1-year option ৳999",
       ],
-      durationDays: 30,
-      isFeatured: false,
-      isActive: true,
-      stockCount: 100,
+      durationDays: 30, isFeatured: true, isActive: true, stockCount: 200,
     },
     {
       id: 9,
-      name: "ElevenLabs Creator",
+      name: "Adobe Creative Cloud All Apps",
       description:
-        "Clone voices and generate ultra-realistic AI speech. Perfect for content creators, podcasters, and YouTubers.",
-      originalPriceBdt: "999",
-      priceBdt: String(discounted(999)),
-      categoryId: aiVideo,
-      imageUrl: "https://logo.clearbit.com/elevenlabs.io",
+        "Photoshop, Illustrator, Premiere, After Effects, Lightroom and more — the full Adobe suite for design and video students.",
+      originalPriceBdt: "5990", priceBdt: "1490",
+      categoryId: aiImage, imageUrl: "https://logo.clearbit.com/adobe.com",
       features: [
-        "Voice cloning",
-        "100K characters/month",
-        "29+ languages",
-        "Commercial license",
-        "Voice library access",
-        "API access",
+        "All 20+ Adobe apps",
+        "Photoshop, Illustrator, Premiere",
+        "Adobe Firefly AI included",
+        "100 GB cloud storage",
+        "Personal account with email",
+        "30-day warranty",
       ],
-      durationDays: 30,
-      isFeatured: false,
-      isActive: true,
-      stockCount: 100,
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 30,
     },
-
-    // ── Student Packages ──────────────────────────────────────────────────────
     {
       id: 10,
-      name: "Student Essentials Package",
+      name: "Leonardo AI Apprentice",
       description:
-        "The ultimate student starter pack — ChatGPT Plus + Grammarly + Canva Pro. Everything you need for university.",
-      originalPriceBdt: "599",
-      priceBdt: "449",
-      categoryId: studentPkg,
-      imageUrl: null,
+        "Fast, controllable AI image generation tuned for game art, product mockups, and social content.",
+      originalPriceBdt: "1190", priceBdt: "490",
+      categoryId: aiImage, imageUrl: "https://logo.clearbit.com/leonardo.ai",
       features: [
-        "ChatGPT Plus Shared",
-        "Grammarly Premium",
-        "Canva Pro (30 days)",
+        "8,500 fast tokens/month",
+        "Image-to-image & inpainting",
+        "Custom model training",
+        "ControlNet access",
+        "Personal account",
+        "Commercial-use rights",
       ],
-      durationDays: 30,
-      isFeatured: true,
-      isActive: true,
-      stockCount: 100,
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 50,
     },
     {
       id: 11,
-      name: "University Pro Package",
+      name: "Ideogram Plus",
       description:
-        "Level up your academic performance with our most popular student bundle — ChatGPT + Claude + Notion AI.",
-      originalPriceBdt: "1149",
-      priceBdt: "899",
-      categoryId: studentPkg,
-      imageUrl: null,
+        "Best-in-class AI image generator for posters, logos, and typography — no competitor handles text in images this well.",
+      originalPriceBdt: "990", priceBdt: "590",
+      categoryId: aiImage, imageUrl: "https://logo.clearbit.com/ideogram.ai",
       features: [
-        "ChatGPT Plus Shared",
-        "Claude Pro Shared",
-        "Notion AI Add-on",
+        "400 priority generations/month",
+        "Perfect text-in-image rendering",
+        "Magic Prompt enhancement",
+        "Personal account",
+        "Commercial-use rights",
+        "30-day warranty",
       ],
-      durationDays: 30,
-      isFeatured: true,
-      isActive: true,
-      stockCount: 100,
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 50,
     },
+
+    // ── AI Video & Audio (3) ──────────────────────────────────────────────────
     {
       id: 12,
-      name: "Research Powerhouse Package",
+      name: "Runway Gen-3 Standard",
       description:
-        "Built for thesis writers and researchers. Get the full AI research toolkit at one affordable price.",
-      originalPriceBdt: "1549",
-      priceBdt: "1199",
-      categoryId: studentPkg,
-      imageUrl: null,
+        "Pro-grade AI video generation. Turn text or images into cinematic clips — used by filmmakers and content creators worldwide.",
+      originalPriceBdt: "1799", priceBdt: "1390",
+      categoryId: aiVideo, imageUrl: "https://logo.clearbit.com/runwayml.com",
       features: [
-        "ChatGPT Plus Solo",
-        "Claude Pro Shared",
-        "Grammarly Premium",
+        "Gen-3 Alpha & Gen-4 access",
+        "625 credits/month",
+        "Text-to-video & image-to-video",
+        "Video-to-video & inpainting",
+        "4K upscaling",
+        "Personal account",
       ],
-      durationDays: 30,
-      isFeatured: false,
-      isActive: true,
-      stockCount: 100,
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 30,
     },
     {
       id: 13,
+      name: "ElevenLabs Creator",
+      description:
+        "Generate ultra-realistic AI voices in 30+ languages including Bangla. Clone your own voice for podcasts, reels, and YouTube.",
+      originalPriceBdt: "2200", priceBdt: "990",
+      categoryId: aiVideo, imageUrl: "https://logo.clearbit.com/elevenlabs.io",
+      features: [
+        "100K characters/month",
+        "Voice cloning",
+        "30+ languages incl. Bangla",
+        "Commercial license",
+        "Voice library access",
+        "Personal account",
+      ],
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 40,
+    },
+    {
+      id: 14,
+      name: "HeyGen Creator",
+      description:
+        "Create AI avatar videos that speak any language. Perfect for course creators, marketers, and freelance video editors.",
+      originalPriceBdt: "2900", priceBdt: "1490",
+      categoryId: aiVideo, imageUrl: "https://logo.clearbit.com/heygen.com",
+      features: [
+        "30 minutes of video/month",
+        "150+ AI avatars",
+        "175+ languages",
+        "Custom avatar (with proof)",
+        "Personal account",
+        "30-day warranty",
+      ],
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 25,
+    },
+
+    // ── AI Productivity (2) ───────────────────────────────────────────────────
+    {
+      id: 15,
+      name: "Notion AI Add-on",
+      description:
+        "Add an AI co-writer to your Notion workspace. Summarize lectures, draft assignments, and Q&A on your own notes.",
+      originalPriceBdt: "1100", priceBdt: "390",
+      categoryId: aiProductivity, imageUrl: "https://logo.clearbit.com/notion.so",
+      features: [
+        "AI writing assistant",
+        "Summarize & translate",
+        "Action item extraction",
+        "Q&A on your workspace",
+        "Works on any Notion plan",
+        "Shared seat",
+      ],
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 80,
+    },
+    {
+      id: 16,
+      name: "Grammarly Premium",
+      description:
+        "Catch grammar errors, improve clarity, and adjust tone. Essential for assignments, emails, and IELTS-level writing.",
+      originalPriceBdt: "1500", priceBdt: "299",
+      categoryId: aiProductivity, imageUrl: "https://logo.clearbit.com/grammarly.com",
+      features: [
+        "Advanced grammar & spell check",
+        "Tone & clarity suggestions",
+        "Plagiarism detection",
+        "Generative AI rewrites",
+        "Works in Word, Docs, browser",
+        "1-year option ৳1,490",
+      ],
+      durationDays: 30, isFeatured: true, isActive: true, stockCount: 150,
+    },
+
+    // ── AI Code & Dev (2) ─────────────────────────────────────────────────────
+    {
+      id: 17,
+      name: "GitHub Copilot Pro",
+      description:
+        "AI pair-programmer powered by GPT-4o. Autocomplete, chat, and code review for CSE students and dev freelancers.",
+      originalPriceBdt: "1190", priceBdt: "490",
+      categoryId: aiCode, imageUrl: "https://logo.clearbit.com/github.com",
+      features: [
+        "GPT-4o & Claude 4 in editor",
+        "VS Code, JetBrains, Neovim",
+        "Copilot Chat & Edits",
+        "Pull request summaries",
+        "Personal account with email",
+        "Free for verified students",
+      ],
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 40,
+    },
+    {
+      id: 18,
+      name: "Cursor Pro",
+      description:
+        "The AI-first code editor used by serious developers. Build full features with Composer agent and Claude/GPT inside your repo.",
+      originalPriceBdt: "2400", priceBdt: "1290",
+      categoryId: aiCode, imageUrl: "https://logo.clearbit.com/cursor.com",
+      features: [
+        "500 fast premium requests/mo",
+        "Composer multi-file agent",
+        "GPT-5, Claude 4 Opus, Gemini 2.5",
+        "Codebase-aware chat",
+        "Personal account",
+        "Cancel anytime",
+      ],
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 30,
+    },
+
+    // ── Student Packages (6) ──────────────────────────────────────────────────
+    {
+      id: 19,
+      name: "Student Essentials Package",
+      description:
+        "The starter pack every Bangladeshi student needs — ChatGPT Plus + Grammarly + Canva Pro at one combined price.",
+      originalPriceBdt: "1290", priceBdt: "449",
+      categoryId: studentPkg, imageUrl: null,
+      features: [
+        "ChatGPT Plus (Shared)",
+        "Grammarly Premium",
+        "Canva Pro (30 days)",
+        "Save 65% vs buying separately",
+      ],
+      durationDays: 30, isFeatured: true, isActive: true, stockCount: 100,
+    },
+    {
+      id: 20,
+      name: "University Pro Package",
+      description:
+        "Our most popular student bundle — pair ChatGPT and Claude with Notion AI for unbeatable academic productivity.",
+      originalPriceBdt: "1990", priceBdt: "899",
+      categoryId: studentPkg, imageUrl: null,
+      features: [
+        "ChatGPT Plus (Shared)",
+        "Claude Pro (Shared)",
+        "Notion AI Add-on",
+        "Best-seller — 4.9/5 rated",
+      ],
+      durationDays: 30, isFeatured: true, isActive: true, stockCount: 100,
+    },
+    {
+      id: 21,
+      name: "Research Powerhouse Package",
+      description:
+        "Built for thesis writers and research scholars — long-context Claude, Perplexity research engine, and Grammarly polish.",
+      originalPriceBdt: "2290", priceBdt: "1199",
+      categoryId: studentPkg, imageUrl: null,
+      features: [
+        "Claude Pro (Shared)",
+        "Perplexity Pro",
+        "Grammarly Premium",
+        "ChatGPT Plus (Shared) bonus",
+      ],
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 60,
+    },
+    {
+      id: 22,
       name: "Creative Student Bundle",
       description:
-        "Design, generate images, and edit videos like a pro. Perfect for media, art, and design students.",
-      originalPriceBdt: "1799",
-      priceBdt: "1399",
-      categoryId: studentPkg,
-      imageUrl: null,
+        "For media, fine arts, and design students — Canva Pro, Midjourney for image generation, and Runway for video projects.",
+      originalPriceBdt: "2890", priceBdt: "1399",
+      categoryId: studentPkg, imageUrl: null,
       features: [
         "Canva Pro",
         "Midjourney Shared",
-        "Runway Gen-3",
+        "Runway Gen-3 Standard",
+        "ChatGPT Plus (Shared) bonus",
       ],
-      durationDays: 30,
-      isFeatured: false,
-      isActive: true,
-      stockCount: 100,
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 40,
+    },
+    {
+      id: 23,
+      name: "Thesis Writer Pack",
+      description:
+        "Finish your thesis 3× faster — Claude Pro Personal for long writing, Grammarly for polish, and Perplexity for citations.",
+      originalPriceBdt: "2890", priceBdt: "1690",
+      categoryId: studentPkg, imageUrl: null,
+      features: [
+        "Claude Pro (Personal)",
+        "Grammarly Premium",
+        "Perplexity Pro",
+        "30-day warranty",
+      ],
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 30,
+    },
+    {
+      id: 24,
+      name: "Internship Boost Pack",
+      description:
+        "Land your first internship — AI to polish your resume, build a portfolio site, and ace mock interviews.",
+      originalPriceBdt: "1490", priceBdt: "699",
+      categoryId: studentPkg, imageUrl: null,
+      features: [
+        "ChatGPT Plus (Shared)",
+        "Grammarly Premium",
+        "Canva Pro (resume + portfolio)",
+        "Free 30-min coaching call",
+      ],
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 60,
     },
 
-    // ── Freelancer Packages ───────────────────────────────────────────────────
+    // ── Freelancer Packages (5) ───────────────────────────────────────────────
     {
-      id: 14,
+      id: 25,
       name: "Freelancer Starter Pack",
       description:
-        "Launch your freelancing career with essential AI writing and design tools.",
-      originalPriceBdt: "1399",
-      priceBdt: "1099",
-      categoryId: freelancerPkg,
-      imageUrl: null,
+        "Launch your freelancing career on Fiverr or Upwork with a clean, AI-powered writing and design stack.",
+      originalPriceBdt: "1690", priceBdt: "1099",
+      categoryId: freelancerPkg, imageUrl: null,
       features: [
-        "ChatGPT Plus Shared",
+        "ChatGPT Plus (Shared)",
         "Canva Pro",
         "Grammarly Premium",
+        "Fiverr/Upwork onboarding tips",
       ],
-      durationDays: 30,
-      isFeatured: false,
-      isActive: true,
-      stockCount: 100,
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 50,
     },
     {
-      id: 15,
+      id: 26,
       name: "Freelancer Pro Pack",
       description:
-        "The complete AI toolkit for professional freelancers — writing, design, video, and voice.",
-      originalPriceBdt: "3199",
-      priceBdt: "2499",
-      categoryId: freelancerPkg,
-      imageUrl: null,
+        "The complete pro toolkit — personal ChatGPT, Midjourney for visuals, Canva, and ElevenLabs for voiceovers.",
+      originalPriceBdt: "3990", priceBdt: "2499",
+      categoryId: freelancerPkg, imageUrl: null,
       features: [
-        "ChatGPT Plus Solo",
+        "ChatGPT Plus (Personal)",
         "Midjourney Shared",
         "Canva Pro",
         "ElevenLabs Creator",
       ],
-      durationDays: 30,
-      isFeatured: false,
-      isActive: true,
-      stockCount: 100,
+      durationDays: 30, isFeatured: true, isActive: true, stockCount: 30,
     },
     {
-      id: 16,
+      id: 27,
+      name: "Designer Power Pack",
+      description:
+        "Pixel-perfect design stack — Adobe Creative Cloud, Midjourney, and Ideogram for posters, branding, and product art.",
+      originalPriceBdt: "5490", priceBdt: "2790",
+      categoryId: freelancerPkg, imageUrl: null,
+      features: [
+        "Adobe Creative Cloud (All Apps)",
+        "Midjourney Shared",
+        "Ideogram Plus",
+        "Canva Pro bonus",
+      ],
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 20,
+    },
+    {
+      id: 28,
+      name: "Video Creator Pack",
+      description:
+        "Everything to ship YouTube/Reels content — Runway for clips, ElevenLabs for voice, HeyGen for avatars, ChatGPT for scripts.",
+      originalPriceBdt: "5990", priceBdt: "3290",
+      categoryId: freelancerPkg, imageUrl: null,
+      features: [
+        "Runway Gen-3 Standard",
+        "ElevenLabs Creator",
+        "HeyGen Creator",
+        "ChatGPT Plus (Shared) bonus",
+      ],
+      durationDays: 30, isFeatured: false, isActive: true, stockCount: 20,
+    },
+    {
+      id: 29,
       name: "AI Premium Monthly Access Pass",
       description:
-        "Full access to our curated AI tool library. The best value for power users.",
-      originalPriceBdt: "1299",
-      priceBdt: "999",
-      categoryId: freelancerPkg,
-      imageUrl: null,
+        "All-access pass to AIPT's most-loved tools at one flat monthly price. The best value for AI power users.",
+      originalPriceBdt: "2290", priceBdt: "999",
+      categoryId: freelancerPkg, imageUrl: null,
       features: [
-        "ChatGPT Plus Shared",
-        "Claude Pro Shared",
+        "ChatGPT Plus (Shared)",
+        "Claude Pro (Shared)",
         "Canva Pro",
         "Grammarly Premium",
       ],
-      durationDays: 30,
-      isFeatured: false,
-      isActive: true,
-      stockCount: 100,
+      durationDays: 30, isFeatured: true, isActive: true, stockCount: 80,
     },
   ];
 
@@ -434,14 +559,11 @@ async function main() {
     console.log(`  ✓ [${p.id}] ${p.name}  ৳${p.priceBdt}`);
   }
 
-  // Advance the products sequence to max(id) so that future INSERTs
-  // without an explicit id don't collide with the rows we just seeded.
   await db.execute(
     sql`SELECT setval(pg_get_serial_sequence('products', 'id'), (SELECT COALESCE(MAX(id), 0) FROM products))`,
   );
   console.log("\nSequence advanced to max(id).");
-
-  console.log("Product catalog seeded successfully.");
+  console.log(`\n✅ ${products.length} products seeded.`);
   process.exit(0);
 }
 
