@@ -1,11 +1,11 @@
 export const WHATSAPP_NUMBER: string =
-  (import.meta.env.VITE_WHATSAPP_NUMBER as string | undefined) ?? "8801XXXXXXXXX";
+  (import.meta.env.VITE_WHATSAPP_NUMBER as string | undefined) ?? "8801970679938";
 
 export const BKASH_NUMBER: string =
-  (import.meta.env.VITE_BKASH_NUMBER as string | undefined) ?? "01XXXXXXXXX";
+  (import.meta.env.VITE_BKASH_NUMBER as string | undefined) ?? "01970679938";
 
 export const NAGAD_NUMBER: string =
-  (import.meta.env.VITE_NAGAD_NUMBER as string | undefined) ?? "01XXXXXXXXX";
+  (import.meta.env.VITE_NAGAD_NUMBER as string | undefined) ?? "01970679938";
 
 export const BANK_INFO: string =
   (import.meta.env.VITE_BANK_INFO as string | undefined) ?? "Dutch-Bangla Bank";

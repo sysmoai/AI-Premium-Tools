@@ -30,7 +30,7 @@ export default function Footer() {
                 AIPT
               </div>
               <p className="text-muted-foreground text-sm leading-relaxed">
-                AI Premium Tools — Bangladesh's student-first AI subscription store. Superior AI, surprising prices.
+                Ai Premium Tools — Affordable AI subscriptions for all in Bangladesh.
               </p>
               <div className="mt-4 text-sm text-muted-foreground">
                 📍 Bangladesh · 🕐 Delivery within 1 hour

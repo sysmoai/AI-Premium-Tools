@@ -82,7 +82,7 @@ export default function Home({ onAddToCart }: HomeProps) {
               🇧🇩 Bangladesh's #1 Student AI Store
             </Badge>
             <h1 className="font-black mb-6 leading-tight" style={{ fontFamily: "Outfit, sans-serif", fontSize: "clamp(2.5rem, 6vw, 4.5rem)" }}>
-              Superior AI,
+              Affordable AI
               <span
                 className="block"
                 style={{
@@ -92,12 +92,12 @@ export default function Home({ onAddToCart }: HomeProps) {
                   backgroundClip: "text",
                 }}
               >
-                Surprising Prices.
+                Subscriptions
               </span>
-              <span className="block text-white/70 text-3xl md:text-4xl mt-1">Built for Bangladesh.</span>
+              <span className="block text-white/70 text-3xl md:text-4xl mt-1">for All in Bangladesh.</span>
             </h1>
             <p className="text-lg text-white/80 mb-10 max-w-xl leading-relaxed">
-              Premium AI tools — ChatGPT, Midjourney, Canva Pro, and 25+ more — at 15–20% below market price.
+              Your trusted partner for affordable educational and freelancing tool subscriptions. Premium AI tools at prices everyone can afford.
             </p>
             <div className="flex flex-wrap gap-4">
               <Link href="/products">
