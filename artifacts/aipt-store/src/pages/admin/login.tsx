@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { adminLogin } from "@workspace/api-client-react";
 
 interface AdminLoginProps {
   onLogin: () => void;
@@ -19,16 +20,25 @@ const FEATURES = [
 
 export default function AdminLogin({ onLogin }: AdminLoginProps) {
   const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (password === "aipt2024") {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const { token } = await adminLogin({ password });
+      // The localStorage flag is just a UI hint — every protected admin call
+      // re-validates this bearer token on the server.
+      localStorage.setItem("aipt_admin_token", token);
       localStorage.setItem("aipt_admin", "true");
       onLogin();
       toast({ title: "Welcome, Admin!", description: "You are now logged in." });
-    } else {
+    } catch {
       toast({ title: "Incorrect password", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -134,8 +144,8 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
                 className="h-12 rounded-lg"
               />
             </div>
-            <Button type="submit" className="w-full h-12 font-bold rounded-lg shadow-md" data-testid="btn-admin-login">
-              Sign in to Admin Panel
+            <Button type="submit" className="w-full h-12 font-bold rounded-lg shadow-md" disabled={submitting} data-testid="btn-admin-login">
+              {submitting ? "Signing in…" : "Sign in to Admin Panel"}
             </Button>
           </form>
 

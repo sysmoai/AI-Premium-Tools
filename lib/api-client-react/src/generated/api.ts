@@ -17,6 +17,8 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AdminLoginBody,
+  AdminLoginResponse,
   Category,
   CreateCategoryBody,
   CreateCustomerBody,
@@ -24,6 +26,7 @@ import type {
   CreateProductBody,
   Customer,
   DashboardStats,
+  GetOrderParams,
   GetRecentOrdersParams,
   GetTopProductsParams,
   HealthStatus,
@@ -1069,31 +1072,50 @@ export const useCreateOrder = <
 };
 
 /**
+ * Public lookup for customers. Without an admin token, the request must
+include the `phone` query parameter matching the order's customer phone
+(digits only). Non-admin responses omit `customer_phone`, `payment_ref`,
+and `notes`. With an admin bearer token, all fields are returned.
+
  * @summary Get order by ID
  */
-export const getGetOrderUrl = (id: number) => {
-  return `/api/orders/${id}`;
+export const getGetOrderUrl = (id: number, params?: GetOrderParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/orders/${id}?${stringifiedParams}`
+    : `/api/orders/${id}`;
 };
 
 export const getOrder = async (
   id: number,
+  params?: GetOrderParams,
   options?: RequestInit,
 ): Promise<Order> => {
-  return customFetch<Order>(getGetOrderUrl(id), {
+  return customFetch<Order>(getGetOrderUrl(id, params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetOrderQueryKey = (id: number) => {
-  return [`/api/orders/${id}`] as const;
+export const getGetOrderQueryKey = (id: number, params?: GetOrderParams) => {
+  return [`/api/orders/${id}`, ...(params ? [params] : [])] as const;
 };
 
 export const getGetOrderQueryOptions = <
   TData = Awaited<ReturnType<typeof getOrder>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
 >(
   id: number,
+  params?: GetOrderParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getOrder>>,
@@ -1105,11 +1127,11 @@ export const getGetOrderQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetOrderQueryKey(id);
+  const queryKey = queryOptions?.queryKey ?? getGetOrderQueryKey(id, params);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof getOrder>>> = ({
     signal,
-  }) => getOrder(id, { signal, ...requestOptions });
+  }) => getOrder(id, params, { signal, ...requestOptions });
 
   return {
     queryKey,
@@ -1124,7 +1146,7 @@ export const getGetOrderQueryOptions = <
 export type GetOrderQueryResult = NonNullable<
   Awaited<ReturnType<typeof getOrder>>
 >;
-export type GetOrderQueryError = ErrorType<unknown>;
+export type GetOrderQueryError = ErrorType<void>;
 
 /**
  * @summary Get order by ID
@@ -1132,9 +1154,10 @@ export type GetOrderQueryError = ErrorType<unknown>;
 
 export function useGetOrder<
   TData = Awaited<ReturnType<typeof getOrder>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
 >(
   id: number,
+  params?: GetOrderParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getOrder>>,
@@ -1144,7 +1167,7 @@ export function useGetOrder<
     request?: SecondParameter<typeof customFetch>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetOrderQueryOptions(id, options);
+  const queryOptions = getGetOrderQueryOptions(id, params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -1487,6 +1510,92 @@ export function useGetCustomer<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Exchange admin password for a bearer token
+ */
+export const getAdminLoginUrl = () => {
+  return `/api/admin/login`;
+};
+
+export const adminLogin = async (
+  adminLoginBody: AdminLoginBody,
+  options?: RequestInit,
+): Promise<AdminLoginResponse> => {
+  return customFetch<AdminLoginResponse>(getAdminLoginUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(adminLoginBody),
+  });
+};
+
+export const getAdminLoginMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminLogin>>,
+    TError,
+    { data: BodyType<AdminLoginBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminLogin>>,
+  TError,
+  { data: BodyType<AdminLoginBody> },
+  TContext
+> => {
+  const mutationKey = ["adminLogin"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminLogin>>,
+    { data: BodyType<AdminLoginBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return adminLogin(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdminLoginMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminLogin>>
+>;
+export type AdminLoginMutationBody = BodyType<AdminLoginBody>;
+export type AdminLoginMutationError = ErrorType<void>;
+
+/**
+ * @summary Exchange admin password for a bearer token
+ */
+export const useAdminLogin = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminLogin>>,
+    TError,
+    { data: BodyType<AdminLoginBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof adminLogin>>,
+  TError,
+  { data: BodyType<AdminLoginBody> },
+  TContext
+> => {
+  return useMutation(getAdminLoginMutationOptions(options));
+};
 
 /**
  * @summary Get admin dashboard statistics

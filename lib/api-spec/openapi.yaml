@@ -20,6 +20,8 @@ tags:
     description: Customer management
   - name: stats
     description: Admin statistics
+  - name: admin
+    description: Admin authentication
 paths:
   /healthz:
     get:
@@ -260,12 +262,22 @@ paths:
       operationId: getOrder
       tags: [orders]
       summary: Get order by ID
+      description: |
+        Public lookup for customers. Without an admin token, the request must
+        include the `phone` query parameter matching the order's customer phone
+        (digits only). Non-admin responses omit `customer_phone`, `payment_ref`,
+        and `notes`. With an admin bearer token, all fields are returned.
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: integer
+        - name: phone
+          in: query
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: Order details
@@ -273,6 +285,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Order"
+        "404":
+          description: Not found or phone does not match
 
   /orders/{id}/status:
     patch:
@@ -350,6 +364,28 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Customer"
+
+  # ── Admin Auth ────────────────────────────────────────────────────────────
+  /admin/login:
+    post:
+      operationId: adminLogin
+      tags: [admin]
+      summary: Exchange admin password for a bearer token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLoginBody"
+      responses:
+        "200":
+          description: Login OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminLoginResponse"
+        "401":
+          description: Invalid password
 
   # ── Admin Stats ───────────────────────────────────────────────────────────
   /stats/dashboard:
@@ -586,8 +622,11 @@ components:
             properties:
               product_id:
                 type: integer
+                minimum: 1
               quantity:
                 type: integer
+                minimum: 1
+                maximum: 100
 
     UpdateOrderStatusBody:
       type: object
@@ -633,6 +672,20 @@ components:
           type: string
 
     # ── Stats ─────────────────────────────────────────────────────────────────
+    AdminLoginBody:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+
+    AdminLoginResponse:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+
     DashboardStats:
       type: object
       required: [total_revenue_bdt, total_orders, total_customers, total_products, pending_orders, monthly_revenue_bdt, delivered_orders, cancelled_orders]

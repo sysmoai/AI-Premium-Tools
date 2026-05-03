@@ -109,7 +109,12 @@ export const CreateOrderBodyPaymentMethod = {
 } as const;
 
 export type CreateOrderBodyItemsItem = {
+  /** @minimum 1 */
   product_id: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
   quantity: number;
 };
 
@@ -153,6 +158,14 @@ export interface CreateCustomerBody {
   university?: string;
 }
 
+export interface AdminLoginBody {
+  password: string;
+}
+
+export interface AdminLoginResponse {
+  token: string;
+}
+
 export interface DashboardStats {
   total_revenue_bdt: number;
   total_orders: number;
@@ -185,6 +198,10 @@ export const ListOrdersStatus = {
   delivered: "delivered",
   cancelled: "cancelled",
 } as const;
+
+export type GetOrderParams = {
+  phone?: string;
+};
 
 export type GetRecentOrdersParams = {
   limit?: number;

@@ -386,7 +386,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
 
             {/* Tabs: Overview / Included / Delivery / FAQ */}
             <Tabs defaultValue="included" className="w-full">
-              <TabsList className="grid w-full grid-cols-5 mb-5">
+              <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 h-auto gap-1 mb-5">
                 <TabsTrigger value="included" data-testid="tab-included">
                   <Check className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
                   Included

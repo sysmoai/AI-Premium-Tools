@@ -3,6 +3,7 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { optionalAdmin } from "./middlewares/admin-auth";
 
 const app: Express = express();
 
@@ -26,9 +27,12 @@ app.use(
   }),
 );
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "100kb" }));
+app.use(express.urlencoded({ extended: true, limit: "100kb" }));
 
+// Stamp req.isAdmin on every request so individual routes can decide how
+// much data to return.
+app.use("/api", optionalAdmin);
 app.use("/api", router);
 
 export default app;

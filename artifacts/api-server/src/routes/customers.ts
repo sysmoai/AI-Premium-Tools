@@ -3,10 +3,11 @@ import { db } from "@workspace/db";
 import { customersTable, ordersTable } from "@workspace/db";
 import { CreateCustomerBody, GetCustomerParams } from "@workspace/api-zod";
 import { eq, sql } from "drizzle-orm";
+import { requireAdmin } from "../middlewares/admin-auth";
 
 const router = Router();
 
-router.get("/customers", async (_req, res) => {
+router.get("/customers", requireAdmin, async (_req, res) => {
   const rows = await db
     .select({
       id: customersTable.id,
@@ -45,7 +46,7 @@ router.post("/customers", async (req, res) => {
   res.status(201).json({ ...customer, order_count: 0, total_spent_bdt: 0, created_at: customer.createdAt.toISOString() });
 });
 
-router.get("/customers/:id", async (req, res) => {
+router.get("/customers/:id", requireAdmin, async (req, res) => {
   const parsed = GetCustomerParams.safeParse({ id: req.params.id });
   if (!parsed.success) { res.status(400).json({ error: parsed.error }); return; }
 

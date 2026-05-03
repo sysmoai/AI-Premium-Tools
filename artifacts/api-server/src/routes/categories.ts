@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { categoriesTable, productsTable } from "@workspace/db";
 import { CreateCategoryBody, UpdateCategoryParams, UpdateCategoryBody, DeleteCategoryParams } from "@workspace/api-zod";
 import { eq, sql } from "drizzle-orm";
+import { requireAdmin } from "../middlewares/admin-auth";
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.get("/categories", async (_req, res) => {
   res.json(rows);
 });
 
-router.post("/categories", async (req, res) => {
+router.post("/categories", requireAdmin, async (req, res) => {
   const parsed = CreateCategoryBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error }); return; }
   const [cat] = await db.insert(categoriesTable).values({
@@ -35,7 +36,7 @@ router.post("/categories", async (req, res) => {
   res.status(201).json({ ...cat, product_count: 0 });
 });
 
-router.put("/categories/:id", async (req, res) => {
+router.put("/categories/:id", requireAdmin, async (req, res) => {
   const paramsParsed = UpdateCategoryParams.safeParse({ id: req.params.id });
   const bodyParsed = UpdateCategoryBody.safeParse(req.body);
   if (!paramsParsed.success || !bodyParsed.success) {
@@ -51,7 +52,7 @@ router.put("/categories/:id", async (req, res) => {
   res.json({ ...cat, product_count: 0 });
 });
 
-router.delete("/categories/:id", async (req, res) => {
+router.delete("/categories/:id", requireAdmin, async (req, res) => {
   const parsed = DeleteCategoryParams.safeParse({ id: req.params.id });
   if (!parsed.success) { res.status(400).json({ error: parsed.error }); return; }
   await db.delete(categoriesTable).where(eq(categoriesTable.id, parsed.data.id));

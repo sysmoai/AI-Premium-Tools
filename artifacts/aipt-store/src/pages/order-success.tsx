@@ -7,10 +7,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useGetOrder, getGetOrderQueryKey } from "@workspace/api-client-react";
 import { useSeo } from "@/hooks/use-seo";
 
+function readStashedPhone(id: string | undefined): string | undefined {
+  if (!id) return undefined;
+  try {
+    return sessionStorage.getItem(`aipt_order_phone_${id}`) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export default function OrderSuccess() {
   const { id } = useParams<{ id: string }>();
-  const { data: order, isLoading } = useGetOrder(Number(id), {
-    query: { enabled: !!id, queryKey: getGetOrderQueryKey(Number(id)) },
+  const phone = readStashedPhone(id);
+  const params = phone ? { phone } : undefined;
+  const { data: order, isLoading } = useGetOrder(Number(id), params, {
+    query: { enabled: !!id, queryKey: getGetOrderQueryKey(Number(id), params) },
   });
 
   useSeo({

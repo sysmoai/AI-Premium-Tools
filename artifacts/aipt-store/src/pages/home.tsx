@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useListProducts, useListCategories, useGetDashboardStats } from "@workspace/api-client-react";
+import { useListProducts, useListCategories } from "@workspace/api-client-react";
 import { useInView } from "@/hooks/use-in-view";
 import { WHATSAPP_URL } from "@/config/contact";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
@@ -46,7 +46,6 @@ export default function Home({ onAddToCart }: HomeProps) {
   const { data: featured, isLoading: featuredLoading } = useListProducts({ featured: true, is_active: true });
   const { data: allProducts } = useListProducts({ is_active: true });
   const { data: categories, isLoading: catsLoading } = useListCategories();
-  const { data: stats } = useGetDashboardStats();
   const { ref: statRef, inView: statInView } = useInView();
   const { ids: recentIds } = useRecentlyViewed();
   const recentProducts = recentIds
@@ -56,7 +55,9 @@ export default function Home({ onAddToCart }: HomeProps) {
 
   const studentPackagesCat = categories?.find(c => c.slug === "student-packages");
   const studentPackagesHref = studentPackagesCat ? `/products?category_id=${studentPackagesCat.id}` : "/products";
-  const totalToolsCount = stats?.total_products ?? 71;
+  // Derived from the public products endpoint — the dashboard stats endpoint
+  // is admin-only and shouldn't be reached from a marketing page.
+  const totalToolsCount = (allProducts?.length ?? 0) || 71;
   const totalCustomersClaim = "1000+";
 
   useSeo({

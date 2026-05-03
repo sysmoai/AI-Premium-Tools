@@ -153,6 +153,14 @@ export default function Checkout({ items, total, onClearCart }: CheckoutProps) {
           items: items.map(i => ({ product_id: i.productId, quantity: i.quantity })),
         },
       });
+      // Stash the phone for the order-success page so it can fetch the order
+      // back from the now-phone-gated GET /orders/:id endpoint without making
+      // the user re-enter it.
+      try {
+        sessionStorage.setItem(`aipt_order_phone_${order.id}`, phoneDigits);
+      } catch {
+        /* best-effort only */
+      }
       onClearCart();
       navigate(`/order-success/${order.id}`);
     } catch (err) {

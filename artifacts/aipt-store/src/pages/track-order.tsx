@@ -82,18 +82,13 @@ export default function TrackOrder() {
 
     setLoading(true);
     try {
-      const result = await getOrder(id);
-      // Require exact phone match (digits only) — last-N fallback would let
-      // attackers brute-force orders by guessing common BD prefixes.
-      const stored = (result.customer_phone ?? "").replace(/\D/g, "");
+      // Server enforces phone matching and returns 404 on mismatch — we just
+      // forward the digits-only phone as a query param.
       const entered = ph.replace(/\D/g, "");
-      if (!stored || !entered || stored !== entered) {
-        setError("We couldn't find an order matching both that ID and phone number. Double-check and try again.");
-        return;
-      }
+      const result = await getOrder(id, { phone: entered });
       setOrder(result);
     } catch {
-      setError("Order not found. Please check your order ID and try again.");
+      setError("We couldn't find an order matching both that ID and phone number. Double-check and try again.");
     } finally {
       setLoading(false);
     }
@@ -179,10 +174,12 @@ export default function TrackOrder() {
             <Separator className="my-4" />
 
             <div className="text-sm space-y-2 mb-6">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Customer</span>
-                <span className="font-medium">{order.customer_name}</span>
-              </div>
+              {order.customer_name && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Customer</span>
+                  <span className="font-medium">{order.customer_name}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Payment method</span>
                 <span className="font-medium capitalize">{order.payment_method?.replace("_", " ")}</span>

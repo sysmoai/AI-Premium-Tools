@@ -132,6 +132,7 @@ export default function Cart({ items, total, onRemove, onUpdateQuantity }: CartP
                         variant="ghost" size="icon"
                         className="h-9 w-9 text-muted-foreground hover:text-destructive shrink-0 -mt-1 -mr-1"
                         onClick={() => onRemove(item.productId)}
+                        aria-label={`Remove ${item.name} from cart`}
                         data-testid={`btn-remove-${item.productId}`}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -141,14 +142,17 @@ export default function Cart({ items, total, onRemove, onUpdateQuantity }: CartP
                       <div className="flex items-center gap-1.5">
                         <Button variant="outline" size="icon" className="h-11 w-11 rounded-lg touch-manipulation"
                           onClick={() => onUpdateQuantity(item.productId, item.quantity - 1)}
+                          aria-label={`Decrease quantity of ${item.name}`}
+                          disabled={item.quantity <= 1}
                           data-testid={`btn-decrease-${item.productId}`}>
                           <Minus className="h-4 w-4" />
                         </Button>
-                        <span className="w-8 text-center font-bold text-base" data-testid={`text-quantity-${item.productId}`}>
+                        <span className="w-8 text-center font-bold text-base" aria-live="polite" data-testid={`text-quantity-${item.productId}`}>
                           {item.quantity}
                         </span>
                         <Button variant="outline" size="icon" className="h-11 w-11 rounded-lg touch-manipulation"
                           onClick={() => onUpdateQuantity(item.productId, item.quantity + 1)}
+                          aria-label={`Increase quantity of ${item.name}`}
                           data-testid={`btn-increase-${item.productId}`}>
                           <Plus className="h-4 w-4" />
                         </Button>
@@ -170,14 +174,17 @@ export default function Cart({ items, total, onRemove, onUpdateQuantity }: CartP
                     <div className="flex items-center gap-1.5 shrink-0">
                       <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg"
                         onClick={() => onUpdateQuantity(item.productId, item.quantity - 1)}
+                        aria-label={`Decrease quantity of ${item.name}`}
+                        disabled={item.quantity <= 1}
                         data-testid={`btn-decrease-${item.productId}`}>
                         <Minus className="h-3 w-3" />
                       </Button>
-                      <span className="w-8 text-center font-bold text-base" data-testid={`text-quantity-${item.productId}`}>
+                      <span className="w-8 text-center font-bold text-base" aria-live="polite" data-testid={`text-quantity-${item.productId}`}>
                         {item.quantity}
                       </span>
                       <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg"
                         onClick={() => onUpdateQuantity(item.productId, item.quantity + 1)}
+                        aria-label={`Increase quantity of ${item.name}`}
                         data-testid={`btn-increase-${item.productId}`}>
                         <Plus className="h-3 w-3" />
                       </Button>
@@ -189,6 +196,7 @@ export default function Cart({ items, total, onRemove, onUpdateQuantity }: CartP
                     </div>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
                       onClick={() => onRemove(item.productId)}
+                      aria-label={`Remove ${item.name} from cart`}
                       data-testid={`btn-remove-${item.productId}`}>
                       <Trash2 className="h-4 w-4" />
                     </Button>

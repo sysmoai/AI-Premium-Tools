@@ -1,10 +1,13 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { ordersTable, orderItemsTable, productsTable, customersTable } from "@workspace/db";
-import { ListOrdersQueryParams, CreateOrderBody, GetOrderParams, UpdateOrderStatusParams, UpdateOrderStatusBody } from "@workspace/api-zod";
+import { ListOrdersQueryParams, CreateOrderBody, GetOrderParams, GetOrderQueryParams, UpdateOrderStatusParams, UpdateOrderStatusBody } from "@workspace/api-zod";
 import { eq, and, desc, sql } from "drizzle-orm";
+import { requireAdmin } from "../middlewares/admin-auth";
 
 const router = Router();
+
+type FullOrder = NonNullable<Awaited<ReturnType<typeof getOrderWithItems>>>;
 
 async function getOrderWithItems(orderId: number) {
   const [order] = await db
@@ -49,7 +52,18 @@ async function getOrderWithItems(orderId: number) {
   };
 }
 
-router.get("/orders", async (req, res) => {
+function digitsOnly(s: string | null | undefined): string {
+  return (s ?? "").replace(/\D/g, "");
+}
+
+function stripPii(order: FullOrder) {
+  // Remove PII for non-admin callers — keep only fields safe to show on a
+  // customer-facing order tracking page.
+  const { customer_phone: _phone, payment_ref: _ref, notes: _notes, ...safe } = order;
+  return safe;
+}
+
+router.get("/orders", requireAdmin, async (req, res) => {
   const parsed = ListOrdersQueryParams.safeParse(req.query);
   if (!parsed.success) { res.status(400).json({ error: parsed.error }); return; }
   const { status, customer_id } = parsed.data;
@@ -91,13 +105,32 @@ router.post("/orders", async (req, res) => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error }); return; }
   const { customer_id, payment_method, payment_ref, notes, items } = parsed.data;
 
-  // Fetch product prices
+  if (items.length === 0) {
+    res.status(400).json({ error: "Order must contain at least one item" });
+    return;
+  }
+
+  // Fetch product prices and verify the product is purchasable
   let total = 0;
   const enrichedItems: Array<{ productId: number; quantity: number; unitPriceBdt: string }> = [];
   for (const item of items) {
-    const [product] = await db.select({ priceBdt: productsTable.priceBdt }).from(productsTable).where(eq(productsTable.id, item.product_id));
-    if (!product) { res.status(400).json({ error: `Product ${item.product_id} not found` }); return; }
+    if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 100) {
+      res.status(400).json({ error: `Invalid quantity for product ${item.product_id}` });
+      return;
+    }
+    const [product] = await db
+      .select({ priceBdt: productsTable.priceBdt, isActive: productsTable.isActive })
+      .from(productsTable)
+      .where(eq(productsTable.id, item.product_id));
+    if (!product || !product.isActive) {
+      res.status(400).json({ error: `Product ${item.product_id} not available` });
+      return;
+    }
     const price = Number(product.priceBdt);
+    if (!Number.isFinite(price) || price < 0) {
+      res.status(500).json({ error: `Bad price configuration for product ${item.product_id}` });
+      return;
+    }
     total += price * item.quantity;
     enrichedItems.push({ productId: item.product_id, quantity: item.quantity, unitPriceBdt: String(price) });
   }
@@ -125,19 +158,39 @@ router.post("/orders", async (req, res) => {
       .where(eq(productsTable.id, item.productId));
   }
 
+  // The customer just placed this order — they're allowed to see all of its
+  // PII fields (phone, payment ref, notes) on the order-success screen.
   const result = await getOrderWithItems(order.id);
   res.status(201).json(result);
 });
 
 router.get("/orders/:id", async (req, res) => {
-  const parsed = GetOrderParams.safeParse({ id: req.params.id });
-  if (!parsed.success) { res.status(400).json({ error: parsed.error }); return; }
-  const order = await getOrderWithItems(parsed.data.id);
+  const paramsParsed = GetOrderParams.safeParse({ id: req.params.id });
+  if (!paramsParsed.success) { res.status(400).json({ error: paramsParsed.error }); return; }
+  const queryParsed = GetOrderQueryParams.safeParse(req.query);
+  if (!queryParsed.success) { res.status(400).json({ error: queryParsed.error }); return; }
+
+  const order = await getOrderWithItems(paramsParsed.data.id);
   if (!order) { res.status(404).json({ error: "Not found" }); return; }
-  res.json(order);
+
+  if (req.isAdmin) {
+    res.json(order);
+    return;
+  }
+
+  // Public lookup — require phone match before returning anything.
+  const provided = digitsOnly(queryParsed.data.phone);
+  const stored = digitsOnly(order.customer_phone);
+  if (!provided || !stored || provided !== stored) {
+    // Return 404 (not 403) so attackers can't tell whether an order ID exists.
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  res.json(stripPii(order));
 });
 
-router.patch("/orders/:id/status", async (req, res) => {
+router.patch("/orders/:id/status", requireAdmin, async (req, res) => {
   const paramsParsed = UpdateOrderStatusParams.safeParse({ id: req.params.id });
   const bodyParsed = UpdateOrderStatusBody.safeParse(req.body);
   if (!paramsParsed.success || !bodyParsed.success) {

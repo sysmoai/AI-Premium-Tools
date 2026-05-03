@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { productsTable, categoriesTable } from "@workspace/db";
 import { ListProductsQueryParams, CreateProductBody, GetProductParams, UpdateProductParams, UpdateProductBody, DeleteProductParams } from "@workspace/api-zod";
 import { eq, ilike, and, sql } from "drizzle-orm";
+import { requireAdmin } from "../middlewares/admin-auth";
 
 const router = Router();
 
@@ -50,7 +51,7 @@ router.get("/products", async (req, res) => {
   })));
 });
 
-router.post("/products", async (req, res) => {
+router.post("/products", requireAdmin, async (req, res) => {
   const parsed = CreateProductBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error });
@@ -117,7 +118,7 @@ router.get("/products/:id", async (req, res) => {
   });
 });
 
-router.put("/products/:id", async (req, res) => {
+router.put("/products/:id", requireAdmin, async (req, res) => {
   const paramsParsed = UpdateProductParams.safeParse({ id: req.params.id });
   const bodyParsed = UpdateProductBody.safeParse(req.body);
   if (!paramsParsed.success || !bodyParsed.success) {
@@ -150,7 +151,7 @@ router.put("/products/:id", async (req, res) => {
   });
 });
 
-router.delete("/products/:id", async (req, res) => {
+router.delete("/products/:id", requireAdmin, async (req, res) => {
   const parsed = DeleteProductParams.safeParse({ id: req.params.id });
   if (!parsed.success) { res.status(400).json({ error: parsed.error }); return; }
   await db.delete(productsTable).where(eq(productsTable.id, parsed.data.id));

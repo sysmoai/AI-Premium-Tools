@@ -3,10 +3,11 @@ import { db } from "@workspace/db";
 import { ordersTable, productsTable, customersTable, orderItemsTable } from "@workspace/db";
 import { GetRecentOrdersQueryParams, GetTopProductsQueryParams } from "@workspace/api-zod";
 import { eq, desc, sql, gte } from "drizzle-orm";
+import { requireAdmin } from "../middlewares/admin-auth";
 
 const router = Router();
 
-router.get("/stats/dashboard", async (_req, res) => {
+router.get("/stats/dashboard", requireAdmin, async (_req, res) => {
   const [revenueRow] = await db.select({
     total: sql<number>`cast(coalesce(sum(${ordersTable.totalBdt}), 0) as float)`,
     count: sql<number>`cast(count(*) as int)`,
@@ -53,7 +54,7 @@ router.get("/stats/dashboard", async (_req, res) => {
   });
 });
 
-router.get("/stats/recent-orders", async (req, res) => {
+router.get("/stats/recent-orders", requireAdmin, async (req, res) => {
   const parsed = GetRecentOrdersQueryParams.safeParse(req.query);
   const limit = parsed.success ? (parsed.data.limit ?? 10) : 10;
 
@@ -85,7 +86,7 @@ router.get("/stats/recent-orders", async (req, res) => {
   })));
 });
 
-router.get("/stats/top-products", async (req, res) => {
+router.get("/stats/top-products", requireAdmin, async (req, res) => {
   const parsed = GetTopProductsQueryParams.safeParse(req.query);
   const limit = parsed.success ? (parsed.data.limit ?? 5) : 5;
 

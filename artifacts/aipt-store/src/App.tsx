@@ -46,12 +46,14 @@ function AppInner() {
 
   function handleLogout() {
     localStorage.removeItem("aipt_admin");
+    localStorage.removeItem("aipt_admin_token");
     setIsAdmin(false);
   }
 
   const isAdminRoute = location.startsWith("/admin");
 
   return (
+    <ErrorBoundary>
     <div className="min-h-screen flex flex-col">
       {!isAdminRoute && <Navbar cartCount={count} />}
       <div className="flex-1">
@@ -87,6 +89,7 @@ function AppInner() {
       </div>
       {!isAdminRoute && <Footer />}
     </div>
+    </ErrorBoundary>
   );
 }
 

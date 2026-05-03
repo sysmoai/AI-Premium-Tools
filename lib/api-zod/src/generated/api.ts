@@ -224,6 +224,9 @@ export const ListOrdersResponse = zod.array(ListOrdersResponseItem);
 /**
  * @summary Place a new order
  */
+
+export const createOrderBodyItemsItemQuantityMax = 100;
+
 export const CreateOrderBody = zod.object({
   customer_id: zod.number(),
   payment_method: zod.enum(["bkash", "nagad", "bank_transfer"]),
@@ -231,17 +234,26 @@ export const CreateOrderBody = zod.object({
   notes: zod.string().optional(),
   items: zod.array(
     zod.object({
-      product_id: zod.number(),
-      quantity: zod.number(),
+      product_id: zod.number().min(1),
+      quantity: zod.number().min(1).max(createOrderBodyItemsItemQuantityMax),
     }),
   ),
 });
 
 /**
+ * Public lookup for customers. Without an admin token, the request must
+include the `phone` query parameter matching the order's customer phone
+(digits only). Non-admin responses omit `customer_phone`, `payment_ref`,
+and `notes`. With an admin bearer token, all fields are returned.
+
  * @summary Get order by ID
  */
 export const GetOrderParams = zod.object({
   id: zod.coerce.number(),
+});
+
+export const GetOrderQueryParams = zod.object({
+  phone: zod.coerce.string().optional(),
 });
 
 export const GetOrderResponse = zod.object({
@@ -348,6 +360,17 @@ export const GetCustomerResponse = zod.object({
   order_count: zod.number().optional(),
   total_spent_bdt: zod.number().optional(),
   created_at: zod.string(),
+});
+
+/**
+ * @summary Exchange admin password for a bearer token
+ */
+export const AdminLoginBody = zod.object({
+  password: zod.string(),
+});
+
+export const AdminLoginResponse = zod.object({
+  token: zod.string(),
 });
 
 /**
