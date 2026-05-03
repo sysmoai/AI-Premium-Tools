@@ -46,4 +46,4 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
-VITE_WHATSAPP_NUMBER = "8801XXXXXXXXX"
+VITE_WHATSAPP_NUMBER = "8801970679938"

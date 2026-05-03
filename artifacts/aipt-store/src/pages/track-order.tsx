@@ -130,7 +130,7 @@ export default function TrackOrder() {
                 <Label htmlFor="phone">Phone number</Label>
                 <Input
                   id="phone"
-                  placeholder="01XXXXXXXXX"
+                  placeholder="e.g. 01712345678"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
                   inputMode="tel"
