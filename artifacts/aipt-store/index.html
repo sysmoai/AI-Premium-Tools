@@ -45,6 +45,16 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function () {
+        try {
+          var p = new URLSearchParams(window.location.search).get("theme");
+          if (p === "dark") { document.documentElement.classList.add("dark"); localStorage.setItem("aipt_dark", "true"); }
+          else if (p === "light") { document.documentElement.classList.remove("dark"); localStorage.setItem("aipt_dark", "false"); }
+          else if (localStorage.getItem("aipt_dark") === "true") { document.documentElement.classList.add("dark"); }
+        } catch (e) {}
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -47,13 +47,10 @@ export default function Cart({ items, total, onRemove, onUpdateQuantity }: CartP
     return (
       <div className="max-w-4xl mx-auto px-4 py-24 text-center">
         <div
-          className="inline-flex items-center justify-center h-28 w-28 rounded-lg mb-8 shadow-lg"
-          style={{
-            background: "linear-gradient(135deg, hsl(var(--primary) / 0.1), hsl(var(--secondary) / 0.07))",
-            border: "1px solid hsl(var(--primary) / 0.15)",
-          }}
+          className="inline-flex items-center justify-center h-24 w-24 rounded-2xl mb-8 shadow-xl text-white"
+          style={{ background: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary)))" }}
         >
-          <ShoppingCart className="h-12 w-12 text-primary/50" />
+          <ShoppingCart className="h-12 w-12" />
         </div>
         <h2 className="text-3xl font-bold mb-3" style={{ fontFamily: "Outfit, sans-serif" }}>Your cart is empty</h2>
         <p className="text-muted-foreground mb-8 text-lg">Discover premium AI tools at student-friendly prices</p>
