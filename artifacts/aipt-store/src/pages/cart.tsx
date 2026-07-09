@@ -16,19 +16,6 @@ interface CartProps {
   onUpdateQuantity: (productId: number, quantity: number) => void;
 }
 
-function getItemGradient(name: string): string {
-  const gradients = [
-    "from-violet-500 to-purple-600",
-    "from-blue-500 to-indigo-600",
-    "from-pink-500 to-rose-600",
-    "from-green-500 to-emerald-600",
-    "from-orange-500 to-amber-600",
-    "from-cyan-500 to-blue-600",
-  ];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash + name.charCodeAt(i)) % gradients.length;
-  return gradients[hash];
-}
 
 export default function Cart({ items, total, onRemove, onUpdateQuantity }: CartProps) {
   useSeo({
@@ -107,7 +94,7 @@ export default function Cart({ items, total, onRemove, onUpdateQuantity }: CartP
         {/* Items list */}
         <div className="md:col-span-2 space-y-4">
           {items.map(item => {
-            const gradient = getItemGradient(item.name);
+            const gradient = getProductGradient(item.name);
             const initial = item.name.charAt(0).toUpperCase();
             return (
               <Card key={item.productId} data-testid={`card-cart-item-${item.productId}`} className="overflow-hidden">

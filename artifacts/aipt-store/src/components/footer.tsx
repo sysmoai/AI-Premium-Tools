@@ -38,10 +38,10 @@ const PAYMENT_METHODS = [
 ];
 
 const SOCIALS = [
-  { Icon: Facebook, href: "https://facebook.com", label: "Facebook" },
-  { Icon: Instagram, href: "https://instagram.com", label: "Instagram" },
-  { Icon: Youtube, href: "https://youtube.com", label: "YouTube" },
-  { Icon: Send, href: "https://t.me", label: "Telegram" },
+  { Icon: Facebook, href: "https://facebook.com/aiptbd", label: "Facebook" },
+  { Icon: Instagram, href: "https://instagram.com/aiptbd", label: "Instagram" },
+  { Icon: Youtube, href: "https://youtube.com/@aiptbd", label: "YouTube" },
+  { Icon: Send, href: "https://t.me/aiptbd", label: "Telegram" },
 ];
 
 export default function Footer() {
@@ -207,14 +207,10 @@ export default function Footer() {
                   </Link>
                 </div>
                 <div>
-                  <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
-                    Refund & Warranty
-                  </a>
+                  <Link href="/refund-policy"><span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">Refund Policy</span></Link>
                 </div>
                 <div>
-                  <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
-                    How to Order
-                  </a>
+                  <Link href="/faq"><span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">How to Order</span></Link>
                 </div>
                 <div>
                   <Link href="/faq">
@@ -224,9 +220,7 @@ export default function Footer() {
                   </Link>
                 </div>
                 <div>
-                  <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
-                    Become a Reseller
-                  </a>
+                  <Link href="/contact"><span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">Become a Reseller</span></Link>
                 </div>
               </div>
             </div>
@@ -305,3 +299,4 @@ export default function Footer() {
     </footer>
   );
 }
+
