@@ -1,33 +1,47 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
-import NotFound from "@/pages/not-found";
-import Home from "@/pages/home";
-import Products from "@/pages/products";
-import ProductDetail from "@/pages/product-detail";
-import Cart from "@/pages/cart";
-import Checkout from "@/pages/checkout";
-import OrderSuccess from "@/pages/order-success";
-import TrackOrder from "@/pages/track-order";
-import Faq from "@/pages/faq";
-import About from "@/pages/about";
-import Contact from "@/pages/contact";
-import ShippingPolicy from "@/pages/shipping-policy";
-import RefundPolicy from "@/pages/refund-policy";
-import PrivacyPolicy from "@/pages/privacy-policy";
-import Terms from "@/pages/terms";
 import { ErrorBoundary } from "@/components/error-boundary";
-import AdminLogin from "@/pages/admin/login";
-import AdminDashboard from "@/pages/admin/dashboard";
-import AdminOrders from "@/pages/admin/orders";
-import AdminProducts from "@/pages/admin/products";
-import AdminCustomers from "@/pages/admin/customers";
 import { useCart } from "@/hooks/use-cart";
 import { useToast } from "@/hooks/use-toast";
+
+// Eagerly loaded — needed for first paint
+import Home from "@/pages/home";
+
+// Lazy-loaded routes — code-split per page
+const Products = lazy(() => import("@/pages/products"));
+const ProductDetail = lazy(() => import("@/pages/product-detail"));
+const Cart = lazy(() => import("@/pages/cart"));
+const Checkout = lazy(() => import("@/pages/checkout"));
+const OrderSuccess = lazy(() => import("@/pages/order-success"));
+const TrackOrder = lazy(() => import("@/pages/track-order"));
+const Faq = lazy(() => import("@/pages/faq"));
+const About = lazy(() => import("@/pages/about"));
+const Contact = lazy(() => import("@/pages/contact"));
+const ShippingPolicy = lazy(() => import("@/pages/shipping-policy"));
+const RefundPolicy = lazy(() => import("@/pages/refund-policy"));
+const PrivacyPolicy = lazy(() => import("@/pages/privacy-policy"));
+const Terms = lazy(() => import("@/pages/terms"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+const AdminLogin = lazy(() => import("@/pages/admin/login"));
+const AdminDashboard = lazy(() => import("@/pages/admin/dashboard"));
+const AdminOrders = lazy(() => import("@/pages/admin/orders"));
+const AdminProducts = lazy(() => import("@/pages/admin/products"));
+const AdminCustomers = lazy(() => import("@/pages/admin/customers"));
+
+const PageLoader = () => (
+  <div className="max-w-6xl mx-auto px-4 py-20">
+    <Skeleton className="h-8 w-48 mb-6" />
+    <Skeleton className="h-4 w-full mb-4" />
+    <Skeleton className="h-4 w-3/4 mb-4" />
+    <Skeleton className="h-64 w-full rounded-lg" />
+  </div>
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,7 +61,7 @@ function AppInner() {
 
   function handleAddToCart(product: { productId: number; name: string; price_bdt: number; image_url?: string; duration_days?: number }) {
     addItem(product);
-    toast({ title: "Added to cart", description: `${product.name} added successfully.` });
+    toast({ title: "Added to cart", description: product.name + " added successfully." });
   }
 
   function handleLogout() {
@@ -64,6 +78,7 @@ function AppInner() {
       {!isAdminRoute && <Navbar cartCount={count} />}
       <div className="flex-1">
         <ErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
         <Switch>
           {/* Store routes */}
           <Route path="/" component={() => <Home onAddToCart={handleAddToCart} />} />
@@ -97,6 +112,7 @@ function AppInner() {
 
           <Route component={NotFound} />
         </Switch>
+        </Suspense>
         </ErrorBoundary>
       </div>
       {!isAdminRoute && <Footer />}
