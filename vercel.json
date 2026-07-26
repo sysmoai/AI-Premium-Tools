@@ -1,0 +1,6 @@
+{
+  "buildCommand": "pnpm run build",
+  "outputDirectory": "artifacts",
+  "framework": null,
+  "installCommand": "pnpm install"
+}
