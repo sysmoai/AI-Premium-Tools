@@ -1,0 +1,45 @@
+{
+  "name": "AIPT — AI Premium Tools Bangladesh",
+  "short_name": "AIPT",
+  "description": "Bangladesh's most affordable store for premium AI subscriptions. Pay in BDT via bKash, Nagad, or bank. 1-hour activation, 30-day warranty.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#7c3aed",
+  "lang": "en-BD",
+  "dir": "ltr",
+  "categories": ["shopping", "productivity", "business"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Browse all tools",
+      "short_name": "Tools",
+      "url": "/products"
+    },
+    {
+      "name": "Track my order",
+      "short_name": "Track",
+      "url": "/track-order"
+    },
+    {
+      "name": "View cart",
+      "short_name": "Cart",
+      "url": "/cart"
+    }
+  ]
+}
