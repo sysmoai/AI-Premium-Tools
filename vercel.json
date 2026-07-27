@@ -1,5 +1,5 @@
 {
-  "buildCommand": "BASE_PATH=/ pnpm --filter @workspace/aipt-store run build",
+  "buildCommand": "BASE_PATH=/ PORT=3000 pnpm --filter @workspace/aipt-store run build",
   "outputDirectory": "artifacts/aipt-store/dist/public",
   "framework": null,
   "installCommand": "pnpm install --no-frozen-lockfile"
