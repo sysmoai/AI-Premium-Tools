@@ -1,6 +1,6 @@
 {
-  "buildCommand": "echo skip-build",
-  "outputDirectory": "artifacts/aipt-store",
+  "buildCommand": "BASE_PATH=/ pnpm --filter @workspace/aipt-store run build",
+  "outputDirectory": "artifacts/aipt-store/dist/public",
   "framework": null,
-  "installCommand": "echo skip-install"
+  "installCommand": "pnpm install --no-frozen-lockfile"
 }
