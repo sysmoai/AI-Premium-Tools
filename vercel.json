@@ -1,6 +1,6 @@
 {
-  "buildCommand": "pnpm run build",
-  "outputDirectory": "artifacts",
+  "buildCommand": "echo skip-build",
+  "outputDirectory": "artifacts/aipt-store",
   "framework": null,
-  "installCommand": "pnpm install"
+  "installCommand": "echo skip-install"
 }
