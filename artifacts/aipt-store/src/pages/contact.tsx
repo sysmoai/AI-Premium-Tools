@@ -2,8 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { MessageCircle, Mail, Clock, MapPin } from "lucide-react";
 import { useSeo } from "@/hooks/use-seo";
 import { WHATSAPP_URL } from "@/config/contact";
-
-const ORIGIN = "https://aipt.com.bd";
+import { SITE_URL as ORIGIN } from "@/config/site";
 
 export default function Contact() {
   useSeo({

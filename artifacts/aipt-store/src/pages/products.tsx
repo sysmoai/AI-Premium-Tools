@@ -17,6 +17,7 @@ import {
 import { useListProducts, useListCategories } from "@workspace/api-client-react";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
 import { useSeo } from "@/hooks/use-seo";
+import { SITE_URL } from "@/config/site";
 
 interface ProductsProps {
   onAddToCart: (product: { productId: number; name: string; price_bdt: number; image_url?: string; duration_days?: number }) => void;
@@ -53,7 +54,7 @@ export default function Products({ onAddToCart }: ProductsProps) {
   const totalCount = allProducts?.length ?? 0;
 
   const activeCat = categories?.find(c => c.id === selectedCategory);
-  const ORIGIN = typeof window !== "undefined" ? window.location.origin : "https://aipt.com.bd";
+  const ORIGIN = typeof window !== "undefined" ? window.location.origin : SITE_URL;
   useSeo({
     title: searchQuery
       ? `Search: ${searchQuery} — AI Tools in Bangladesh`

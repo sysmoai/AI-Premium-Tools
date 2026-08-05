@@ -72,4 +72,4 @@ Disallow: /checkout
 Disallow: /cart
 Disallow: /order-success/
 
-Sitemap: https://aipt.com.bd/sitemap.xml
+Sitemap: https://aipremium.tools/sitemap.xml

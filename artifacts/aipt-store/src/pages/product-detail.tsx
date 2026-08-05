@@ -40,6 +40,7 @@ import {
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSeo } from "@/hooks/use-seo";
+import { SITE_URL } from "@/config/site";
 import { useRecentlyViewed } from "@/hooks/use-recently-viewed";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
 import { CustomerReviews } from "@/components/customer-reviews";
@@ -157,8 +158,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
   }, [realReviews]);
 
   // ─── SEO: per-product meta + Google-2024-compliant Product / Breadcrumb / FAQ JSON-LD ───
-  const ORIGIN =
-    typeof window !== "undefined" ? window.location.origin : "https://aipt.com.bd";
+  const ORIGIN = typeof window !== "undefined" ? window.location.origin : SITE_URL;
   const productUrl = product ? `${ORIGIN}/products/${product.id}` : ORIGIN;
   const fallbackOg = `${ORIGIN}/opengraph.jpg`;
   const productImage = product?.image_url || fallbackOg;

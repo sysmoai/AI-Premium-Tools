@@ -31,238 +31,238 @@
 
 - **ChatGPT Plus Starter Shared** — ৳350 BDT · 30 days (save ৳1640)
   - Affordable entry into ChatGPT Plus — perfect for students who need GPT-4o for assignments, research, and study help.
-  - URL: https://aipt.com.bd/products/1
+  - URL: https://aipremium.tools/products/1
 - **ChatGPT Plus Personal** — ৳2990 BDT · 30 days (save ৳1000)
   - Your own private ChatGPT Plus account — full GPT-5 access with custom GPTs, no sharing, perfect for daily power users.
-  - URL: https://aipt.com.bd/products/2
+  - URL: https://aipremium.tools/products/2
 - **Claude Pro Premium Shared** — ৳1495 BDT · 30 days (save ৳1495)
   - Claude Pro by Anthropic — long essays, thesis drafts, and deep document analysis with a 200K context window.
-  - URL: https://aipt.com.bd/products/3
+  - URL: https://aipremium.tools/products/3
 - **Claude Pro Personal** — ৳2990 BDT · 30 days (save ৳1000)
   - Private Claude Pro — uninterrupted access for heavy academic, legal, and writing workflows.
-  - URL: https://aipt.com.bd/products/4
+  - URL: https://aipremium.tools/products/4
 - **Google AI Pro (Gemini Advanced)** — ৳500 BDT · 30 days (save ৳1700)
   - Google's flagship AI — Gemini 2.5 Pro plus Veo video, Deep Research, and 2 TB Drive included.
-  - URL: https://aipt.com.bd/products/5
+  - URL: https://aipremium.tools/products/5
 - **Perplexity Pro Shared** — ৳350 BDT · 30 days (save ৳1640)
   - AI research engine with cited sources — replace 10 Google tabs for assignments and fact-checking.
-  - URL: https://aipt.com.bd/products/6
+  - URL: https://aipremium.tools/products/6
 - **ChatGPT Plus Premium Shared** — ৳950 BDT · 30 days (save ৳1040)
   - Premium shared ChatGPT Plus — fewer users per seat for smoother daily use and faster GPT-5 responses.
-  - URL: https://aipt.com.bd/products/30
+  - URL: https://aipremium.tools/products/30
 - **ChatGPT Go Personal** — ৳1196 BDT · 30 days (save ৳494)
   - OpenAI's lighter ChatGPT Go plan — full personal access at a lower entry price than Plus.
-  - URL: https://aipt.com.bd/products/31
+  - URL: https://aipremium.tools/products/31
 - **ChatGPT Business Starter Shared** — ৳699 BDT · 30 days (save ৳1291)
   - Business-tier ChatGPT — extended limits, GPT-5 priority, and team-grade reliability on a shared seat.
-  - URL: https://aipt.com.bd/products/32
+  - URL: https://aipremium.tools/products/32
 - **ChatGPT Business Premium Shared** — ৳1299 BDT · 30 days (save ৳1191)
   - Premium ChatGPT Business shared seat — even fewer users per workspace for faster responses.
-  - URL: https://aipt.com.bd/products/33
+  - URL: https://aipremium.tools/products/33
 - **ChatGPT Business Personal** — ৳3990 BDT · 30 days (save ৳2000)
   - Private ChatGPT Business workspace — your own seat with GPT-5 priority and connectors.
-  - URL: https://aipt.com.bd/products/34
+  - URL: https://aipremium.tools/products/34
 - **ChatGPT Pro Premium Shared** — ৳4500 BDT · 30 days (save ৳5490)
   - ChatGPT Pro on a premium shared seat — access GPT-5 Pro and o3-pro reasoning at a fraction of the personal price.
-  - URL: https://aipt.com.bd/products/35
+  - URL: https://aipremium.tools/products/35
 - **ChatGPT Pro Personal** — ৳29900 BDT · 30 days (save ৳15000)
   - Top-tier private ChatGPT Pro account — unlimited GPT-5 Pro, Sora, and Operator agent. Built for serious researchers and pros.
-  - URL: https://aipt.com.bd/products/36
+  - URL: https://aipremium.tools/products/36
 - **Claude Max 5x Personal** — ৳14950 BDT · 30 days (save ৳4950)
   - Claude Max with 5× more usage than Pro — for daily heavy users who hit Pro limits often.
-  - URL: https://aipt.com.bd/products/37
+  - URL: https://aipremium.tools/products/37
 - **Claude Max 20x Personal** — ৳29900 BDT · 30 days (save ৳10000)
   - Claude Max with 20× more usage — for power users running long agentic workflows day after day.
-  - URL: https://aipt.com.bd/products/38
+  - URL: https://aipremium.tools/products/38
 - **Claude Team Personal Seat** — ৳3990 BDT · 30 days (save ৳2000)
   - Dedicated Claude Team workspace seat — best for small agencies and dev teams sharing prompts and projects.
-  - URL: https://aipt.com.bd/products/39
+  - URL: https://aipremium.tools/products/39
 - **Perplexity Pro Personal** — ৳2990 BDT · 30 days (save ৳1000)
   - Private Perplexity Pro — unlimited research with no shared-seat queue.
-  - URL: https://aipt.com.bd/products/40
+  - URL: https://aipremium.tools/products/40
 - **Perplexity Max Personal** — ৳29900 BDT · 30 days (save ৳10000)
   - The highest Perplexity tier — Labs, deep research agents, and unlimited heavy use.
-  - URL: https://aipt.com.bd/products/41
+  - URL: https://aipremium.tools/products/41
 - **SuperGrok Lite Personal** — ৳1495 BDT · 30 days (save ৳495)
   - xAI's SuperGrok Lite — Grok 4 with extended limits and DeepSearch on a personal account.
-  - URL: https://aipt.com.bd/products/42
+  - URL: https://aipremium.tools/products/42
 - **SuperGrok Standard Personal** — ৳3990 BDT · 30 days (save ৳2000)
   - Full SuperGrok with Grok 4 Heavy reasoning — the strongest xAI tier available to consumers.
-  - URL: https://aipt.com.bd/products/43
+  - URL: https://aipremium.tools/products/43
 
 ### AI Image & Design
 
 - **Midjourney Standard Shared** — ৳1199 BDT · 30 days (save ৳1201)
   - World-class AI art generation — visuals for projects, presentations, social posts, and freelance gigs.
-  - URL: https://aipt.com.bd/products/7
+  - URL: https://aipremium.tools/products/7
 - **Canva Pro** — ৳199 BDT · 30 days (save ৳300)
   - Premium templates, brand kit, background remover, AI image and video generation — the must-have design app for students.
-  - URL: https://aipt.com.bd/products/8
+  - URL: https://aipremium.tools/products/8
 - **Adobe Creative Cloud (All Apps)** — ৳1490 BDT · 30 days (save ৳4500)
   - Photoshop, Illustrator, Premiere, After Effects, Lightroom and 15+ more — the full Adobe suite for design and video students.
-  - URL: https://aipt.com.bd/products/9
+  - URL: https://aipremium.tools/products/9
 - **Leonardo AI Shared** — ৳599 BDT · 30 days (save ৳591)
   - Fast, controllable AI image generation tuned for game art, product mockups, and social content.
-  - URL: https://aipt.com.bd/products/10
+  - URL: https://aipremium.tools/products/10
 - **Ideogram Plus** — ৳2990 BDT · 30 days (save ৳1000)
   - Best-in-class AI image generator for posters, logos, and typography — no competitor handles text in images this well.
-  - URL: https://aipt.com.bd/products/11
+  - URL: https://aipremium.tools/products/11
 - **Midjourney Standard Premium Shared** — ৳2399 BDT · 30 days (save ৳1591)
   - Midjourney Standard on a premium shared seat — fewer users, smoother peak-hour generation.
-  - URL: https://aipt.com.bd/products/44
+  - URL: https://aipremium.tools/products/44
 - **Midjourney Standard Personal** — ৳3990 BDT · 30 days (save ৳2000)
   - Personal Midjourney Standard — your own Discord/web account with no sharing.
-  - URL: https://aipt.com.bd/products/45
+  - URL: https://aipremium.tools/products/45
 - **Midjourney Pro Shared** — ৳4788 BDT · 30 days (save ৳4202)
   - Midjourney Pro on a shared seat — 15 fast hours/mo plus unlimited relax queue at a fraction of solo cost.
-  - URL: https://aipt.com.bd/products/46
+  - URL: https://aipremium.tools/products/46
 - **Midjourney Pro Personal** — ৳8970 BDT · 30 days (save ৳3020)
   - Personal Midjourney Pro — 15 fast hours, unlimited relax, and stealth privacy on your own account.
-  - URL: https://aipt.com.bd/products/47
+  - URL: https://aipremium.tools/products/47
 - **Midjourney Mega Personal** — ৳17940 BDT · 30 days (save ৳5960)
   - Top Midjourney tier — 60 fast hours/mo plus unlimited relax for studios and high-volume creators.
-  - URL: https://aipt.com.bd/products/48
+  - URL: https://aipremium.tools/products/48
 - **Ideogram Pro Personal** — ৳8970 BDT · 30 days (save ৳3020)
   - Highest Ideogram tier — 1,000 priority generations/mo for designers and ad creatives.
-  - URL: https://aipt.com.bd/products/49
+  - URL: https://aipremium.tools/products/49
 
 ### AI Productivity
 
 - **Notion AI Add-on** — ৳390 BDT · 30 days (save ৳710)
   - Add an AI co-writer to your Notion workspace. Summarize lectures, draft assignments, and Q&A on your own notes.
-  - URL: https://aipt.com.bd/products/15
+  - URL: https://aipremium.tools/products/15
 - **Grammarly Premium** — ৳299 BDT · 30 days (save ৳1201)
   - Catch grammar errors, improve clarity, and adjust tone. Essential for assignments, emails, and IELTS-level writing.
-  - URL: https://aipt.com.bd/products/16
+  - URL: https://aipremium.tools/products/16
 - **Notion Business Monthly** — ৳800 BDT · 30 days (save ৳690)
   - Full Notion Business workspace — unlimited blocks, file uploads, and admin controls. Pairs perfectly with Notion AI.
-  - URL: https://aipt.com.bd/products/61
+  - URL: https://aipremium.tools/products/61
 - **Manus AI Personal** — ৳2500 BDT · 30 days (save ৳1490)
   - Manus AI agent — autonomous task execution that browses, codes, and writes for you. The new wave of AI assistants.
-  - URL: https://aipt.com.bd/products/62
+  - URL: https://aipremium.tools/products/62
 - **Otter.ai Pro Shared** — ৳799 BDT · 30 days (save ৳491)
   - AI meeting transcription and summaries — never take notes in lectures or client calls again.
-  - URL: https://aipt.com.bd/products/63
+  - URL: https://aipremium.tools/products/63
 - **Gamma Plus Shared** — ৳399 BDT · 30 days (save ৳400)
   - AI presentation generator — turn a prompt into a polished slide deck or web doc in 30 seconds.
-  - URL: https://aipt.com.bd/products/64
+  - URL: https://aipremium.tools/products/64
 - **Writesonic Individual Shared** — ৳799 BDT · 30 days (save ৳691)
   - AI writing platform with SEO tools, article generator, and brand voice — for marketers and freelance writers.
-  - URL: https://aipt.com.bd/products/65
+  - URL: https://aipremium.tools/products/65
 
 ### AI Video & Audio
 
 - **Runway Standard Personal** — ৳1794 BDT · 30 days (save ৳1196)
   - Pro-grade AI video generation — turn text or images into cinematic clips. Used by filmmakers and content creators worldwide.
-  - URL: https://aipt.com.bd/products/12
+  - URL: https://aipremium.tools/products/12
 - **ElevenLabs Creator** — ৳3289 BDT · 30 days (save ৳1701)
   - Generate ultra-realistic AI voices in 30+ languages including Bangla. Clone your own voice for podcasts, reels, and YouTube.
-  - URL: https://aipt.com.bd/products/13
+  - URL: https://aipremium.tools/products/13
 - **HeyGen Creator Shared** — ৳1499 BDT · 30 days (save ৳1401)
   - Create AI avatar videos that speak any language — perfect for course creators, marketers, and freelance video editors.
-  - URL: https://aipt.com.bd/products/14
+  - URL: https://aipremium.tools/products/14
 - **Runway Pro Personal** — ৳4186 BDT · 30 days (save ৳1804)
   - Runway Pro — 2,250 credits/mo, 4K exports, and project workspaces. For freelancers and small studios.
-  - URL: https://aipt.com.bd/products/50
+  - URL: https://aipremium.tools/products/50
 - **Runway Unlimited Personal** — ৳11362 BDT · 30 days (save ৳3538)
   - Runway Unlimited — explore relaxed generations endlessly, ideal for daily video iteration.
-  - URL: https://aipt.com.bd/products/51
+  - URL: https://aipremium.tools/products/51
 - **ElevenLabs Starter Personal** — ৳748 BDT · 30 days (save ৳542)
   - Entry-level ElevenLabs with voice cloning and 30K characters/month — perfect for hobbyists and small creators.
-  - URL: https://aipt.com.bd/products/52
+  - URL: https://aipremium.tools/products/52
 - **ElevenLabs Pro Personal** — ৳14802 BDT · 30 days (save ৳5098)
   - ElevenLabs Pro — 500K characters/month, projects mode, and 192 kbps audio. For pro podcasters and audiobook creators.
-  - URL: https://aipt.com.bd/products/53
+  - URL: https://aipremium.tools/products/53
 - **Suno AI Pro Personal** — ৳1495 BDT · 30 days (save ৳495)
   - AI music generation — create full songs with vocals in seconds. Perfect for content creators, ads, and indie artists.
-  - URL: https://aipt.com.bd/products/54
+  - URL: https://aipremium.tools/products/54
 - **Suno AI Premier Personal** — ৳3990 BDT · 30 days (save ৳2000)
   - Top Suno tier — 10,000 credits and early-access models for serious music producers.
-  - URL: https://aipt.com.bd/products/55
+  - URL: https://aipremium.tools/products/55
 - **Udio Pro Shared** — ৳499 BDT · 30 days (save ৳491)
   - Udio AI music generation — high-fidelity vocals and instrumentation on a shared seat.
-  - URL: https://aipt.com.bd/products/56
+  - URL: https://aipremium.tools/products/56
 
 ### Student Packages
 
 - **Student Essentials Package** — ৳449 BDT · 30 days (save ৳841)
   - The starter pack every Bangladeshi student needs — ChatGPT Plus + Grammarly + Canva Pro at one combined price.
-  - URL: https://aipt.com.bd/products/19
+  - URL: https://aipremium.tools/products/19
 - **University Pro Package** — ৳899 BDT · 30 days (save ৳1091)
   - Our most popular student bundle — pair ChatGPT and Claude with Notion AI for unbeatable academic productivity.
-  - URL: https://aipt.com.bd/products/20
+  - URL: https://aipremium.tools/products/20
 - **Research Powerhouse Package** — ৳1199 BDT · 30 days (save ৳1091)
   - Built for thesis writers and research scholars — long-context Claude, Perplexity research engine, and Grammarly polish.
-  - URL: https://aipt.com.bd/products/21
+  - URL: https://aipremium.tools/products/21
 - **Creative Student Bundle** — ৳1399 BDT · 30 days (save ৳1491)
   - For media, fine arts, and design students — Canva Pro, Midjourney for image generation, and Runway for video projects.
-  - URL: https://aipt.com.bd/products/22
+  - URL: https://aipremium.tools/products/22
 - **Thesis Writer Pack** — ৳1690 BDT · 30 days (save ৳1200)
   - Finish your thesis 3× faster — Claude Pro Personal for long writing, Grammarly for polish, and Perplexity for citations.
-  - URL: https://aipt.com.bd/products/23
+  - URL: https://aipremium.tools/products/23
 - **Internship Boost Pack** — ৳699 BDT · 30 days (save ৳791)
   - Land your first internship — AI to polish your resume, build a portfolio site, and ace mock interviews.
-  - URL: https://aipt.com.bd/products/24
+  - URL: https://aipremium.tools/products/24
 
 ### Freelancer Packages
 
 - **Freelancer Starter Pack** — ৳1099 BDT · 30 days (save ৳591)
   - Launch your freelancing career on Fiverr or Upwork with a clean, AI-powered writing and design stack.
-  - URL: https://aipt.com.bd/products/25
+  - URL: https://aipremium.tools/products/25
 - **Freelancer Pro Pack** — ৳3999 BDT · 30 days (save ৳1991)
   - The complete pro toolkit — personal ChatGPT, Midjourney for visuals, Canva, and ElevenLabs for voiceovers.
-  - URL: https://aipt.com.bd/products/26
+  - URL: https://aipremium.tools/products/26
 - **Designer Power Pack** — ৳4990 BDT · 30 days (save ৳3500)
   - Pixel-perfect design stack — Adobe Creative Cloud, Midjourney, and Ideogram for posters, branding, and product art.
-  - URL: https://aipt.com.bd/products/27
+  - URL: https://aipremium.tools/products/27
 - **Video Creator Pack** — ৳5290 BDT · 30 days (save ৳3700)
   - Everything to ship YouTube/Reels content — Runway for clips, ElevenLabs for voice, HeyGen for avatars, ChatGPT for scripts.
-  - URL: https://aipt.com.bd/products/28
+  - URL: https://aipremium.tools/products/28
 - **AI Premium Monthly Access Pass** — ৳999 BDT · 30 days (save ৳1291)
   - All-access pass to AIPT's most-loved tools at one flat monthly price — the best value for AI power users.
-  - URL: https://aipt.com.bd/products/29
+  - URL: https://aipremium.tools/products/29
 - **Business Power Package** — ৳15000 BDT · 30 days (save ৳4900)
   - Premium business stack — ChatGPT Business Personal, Claude Pro Personal, Notion Business, and Adobe CC. For SMBs and consultants.
-  - URL: https://aipt.com.bd/products/66
+  - URL: https://aipremium.tools/products/66
 - **B2B Implementation Package** — ৳25000 BDT · 30 days (save ৳9900)
   - Done-for-you AI rollout for your team — premium tools plus a 1-hour onboarding call and SOP setup.
-  - URL: https://aipt.com.bd/products/67
+  - URL: https://aipremium.tools/products/67
 
 ### AI Code & Dev
 
 - **GitHub Copilot Pro Personal** — ৳1495 BDT · 30 days (save ৳995)
   - AI pair-programmer powered by GPT-4o and Claude 4 — autocomplete, chat, and code review for CSE students and dev freelancers.
-  - URL: https://aipt.com.bd/products/17
+  - URL: https://aipremium.tools/products/17
 - **Cursor Pro Personal** — ৳2990 BDT · 30 days (save ৳1000)
   - The AI-first code editor used by serious developers — Composer agent and Claude/GPT inside your repo.
-  - URL: https://aipt.com.bd/products/18
+  - URL: https://aipremium.tools/products/18
 - **GitHub Copilot Pro+ Personal** — ৳5831 BDT · 30 days (save ৳2159)
   - Copilot Pro+ — premium request pool, Claude 4 Opus & GPT-5 access, and unlimited completions.
-  - URL: https://aipt.com.bd/products/57
+  - URL: https://aipremium.tools/products/57
 - **Cursor Pro+ Personal** — ৳8970 BDT · 30 days (save ৳3020)
   - Cursor Pro+ — 3× more premium requests for builders shipping production features daily.
-  - URL: https://aipt.com.bd/products/58
+  - URL: https://aipremium.tools/products/58
 - **v0.dev Pro Shared** — ৳999 BDT · 30 days (save ৳991)
   - Vercel v0 — turn prompts into production React + Tailwind UI in seconds. Pro shared seat at student price.
-  - URL: https://aipt.com.bd/products/59
+  - URL: https://aipremium.tools/products/59
 - **Replit Core Personal** — ৳500 BDT · 30 days (save ৳490)
   - Replit Core — full Replit Agent, faster machines, and 50+ private apps. Perfect for hobbyist app builders.
-  - URL: https://aipt.com.bd/products/60
+  - URL: https://aipremium.tools/products/60
 
 ### AI Automation
 
 - **Make.com Pro** — ৳1290 BDT · 30 days (save ৳700)
   - Visual no-code automation — connect 1,500+ apps and run complex multi-step workflows. Loved by ops teams and freelancers.
-  - URL: https://aipt.com.bd/products/68
+  - URL: https://aipremium.tools/products/68
 - **Zapier Professional** — ৳1890 BDT · 30 days (save ৳1100)
   - The industry-standard automation platform — wire ChatGPT, Sheets, Gmail, Slack and 7,000+ apps with zero code.
-  - URL: https://aipt.com.bd/products/69
+  - URL: https://aipremium.tools/products/69
 - **n8n Cloud Starter** — ৳899 BDT · 30 days (save ৳591)
   - Open-source automation in the cloud — full control, AI nodes, and 400+ integrations at a flat monthly price.
-  - URL: https://aipt.com.bd/products/70
+  - URL: https://aipremium.tools/products/70
 - **Lindy AI Personal** — ৳2290 BDT · 30 days (save ৳1200)
   - Build AI employees in minutes — agents that handle email, CRM, scheduling, and outreach autonomously.
-  - URL: https://aipt.com.bd/products/71
+  - URL: https://aipremium.tools/products/71
 
 ## Frequently Asked Questions
 
@@ -285,17 +285,17 @@ Full refund if we fail to deliver within 24 hours. After delivery, free replacem
 
 - WhatsApp: see footer of any page on the site
 - Hours: 10am–11pm BD time (UTC+6), 7 days a week
-- Order tracking: https://aipt.com.bd/track-order
+- Order tracking: https://aipremium.tools/track-order
 
 ## Site Map
 
-- Home: https://aipt.com.bd/
-- All products: https://aipt.com.bd/products
-- FAQ: https://aipt.com.bd/faq
-- About: https://aipt.com.bd/about
-- Contact: https://aipt.com.bd/contact
-- Delivery policy: https://aipt.com.bd/shipping-policy
-- Refund &amp; replacement policy: https://aipt.com.bd/refund-policy
-- Privacy policy: https://aipt.com.bd/privacy-policy
-- Terms of service: https://aipt.com.bd/terms
-- Track order: https://aipt.com.bd/track-order
+- Home: https://aipremium.tools/
+- All products: https://aipremium.tools/products
+- FAQ: https://aipremium.tools/faq
+- About: https://aipremium.tools/about
+- Contact: https://aipremium.tools/contact
+- Delivery policy: https://aipremium.tools/shipping-policy
+- Refund &amp; replacement policy: https://aipremium.tools/refund-policy
+- Privacy policy: https://aipremium.tools/privacy-policy
+- Terms of service: https://aipremium.tools/terms
+- Track order: https://aipremium.tools/track-order

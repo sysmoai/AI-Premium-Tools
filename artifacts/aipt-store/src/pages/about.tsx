@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ShieldCheck, Clock, Wallet, MessageCircle, ArrowRight, Heart } from "lucide-react";
 import { useSeo } from "@/hooks/use-seo";
 import { WHATSAPP_URL } from "@/config/contact";
-
-const ORIGIN = "https://aipt.com.bd";
+import { SITE_URL as ORIGIN } from "@/config/site";
 
 export default function About() {
   useSeo({

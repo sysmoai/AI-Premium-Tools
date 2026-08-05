@@ -1,8 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { ShieldCheck } from "lucide-react";
 import { useSeo } from "@/hooks/use-seo";
-
-const ORIGIN = "https://aipt.com.bd";
+import { SITE_URL as ORIGIN } from "@/config/site";
 
 export default function RefundPolicy() {
   useSeo({

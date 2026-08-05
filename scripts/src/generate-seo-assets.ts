@@ -6,7 +6,7 @@
  *   pnpm --filter @workspace/scripts run generate-seo-assets
  *
  * Set AIPT_ORIGIN env var to override the canonical origin
- * (default: https://aipt.com.bd).
+ * (default: https://aipremium.tools).
  */
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -14,7 +14,7 @@ import { dirname, resolve } from "node:path";
 import { db, productsTable, categoriesTable, pool } from "@workspace/db";
 import { eq, asc } from "drizzle-orm";
 
-const ORIGIN = process.env.AIPT_ORIGIN ?? "https://aipt.com.bd";
+const ORIGIN = process.env.AIPT_ORIGIN ?? "https://aipremium.tools";
 // Resolve repo root from this file's location (scripts/src/ → ../../).
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = resolve(__dirname, "../../artifacts/aipt-store/public");
