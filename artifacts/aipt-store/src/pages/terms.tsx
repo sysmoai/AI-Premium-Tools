@@ -90,7 +90,7 @@ export default function Terms() {
           <section>
             <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>7. Contact</h2>
             <p className="text-muted-foreground">
-              Questions about these terms? Email <a href="mailto:hello@aipt.com.bd" className="text-primary hover:underline">hello@aipt.com.bd</a> or message us on WhatsApp.
+              Questions about these terms? Email <a href="mailto:admin@aipremium.tools" className="text-primary hover:underline">admin@aipremium.tools</a> or message us on WhatsApp.
             </p>
           </section>
         </CardContent>

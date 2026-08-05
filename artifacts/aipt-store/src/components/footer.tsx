@@ -246,7 +246,7 @@ export default function Footer() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Mail className="h-3.5 w-3.5 shrink-0" />
-                  <a href="mailto:hello@aipt.com.bd" className="hover:text-foreground transition-colors">hello@aipt.com.bd</a>
+                  <a href="mailto:admin@aipremium.tools" className="hover:text-foreground transition-colors">admin@aipremium.tools</a>
                 </div>
                 <div className="flex items-start gap-2">
                   <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />

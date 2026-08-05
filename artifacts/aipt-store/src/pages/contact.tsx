@@ -8,7 +8,7 @@ export default function Contact() {
   useSeo({
     title: "Contact AIPT — WhatsApp, Email & Support Hours",
     description:
-      "Get in touch with AIPT support. WhatsApp is the fastest channel — typical reply in minutes, 10am–11pm Bangladesh time, every day. You can also email hello@aipt.com.bd.",
+      "Get in touch with AIPT support. WhatsApp is the fastest channel — typical reply in minutes, 10am–11pm Bangladesh time, every day. You can also email admin@aipremium.tools.",
     keywords: "AIPT contact, AI subscription support Bangladesh, WhatsApp support",
     canonical: `${ORIGIN}/contact`,
     jsonLd: [
@@ -21,7 +21,7 @@ export default function Contact() {
         mainEntity: {
           "@type": "Organization",
           name: "AIPT — AI Premium Tools",
-          email: "hello@aipt.com.bd",
+          email: "admin@aipremium.tools",
           areaServed: "BD",
           contactPoint: [
             {
@@ -29,7 +29,7 @@ export default function Contact() {
               contactType: "customer support",
               availableLanguage: ["en", "bn"],
               areaServed: "BD",
-              email: "hello@aipt.com.bd",
+              email: "admin@aipremium.tools",
               hoursAvailable: {
                 "@type": "OpeningHoursSpecification",
                 dayOfWeek: ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
@@ -83,7 +83,7 @@ export default function Contact() {
               <h3 className="font-bold" style={{ fontFamily: "Outfit, sans-serif" }}>Email</h3>
             </div>
             <p className="text-sm text-muted-foreground mb-3">For invoices, refunds, or partnership inquiries.</p>
-            <a href="mailto:hello@aipt.com.bd" className="text-primary text-sm font-semibold hover:underline">hello@aipt.com.bd</a>
+            <a href="mailto:admin@aipremium.tools" className="text-primary text-sm font-semibold hover:underline">admin@aipremium.tools</a>
           </CardContent>
         </Card>
 

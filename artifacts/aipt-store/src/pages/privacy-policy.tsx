@@ -78,7 +78,7 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>Your rights</h2>
             <p className="text-muted-foreground">
-              You can request a copy of the data we hold on you, ask us to correct it, or ask us to delete it. Message us on WhatsApp or email <a href="mailto:hello@aipt.com.bd" className="text-primary hover:underline">hello@aipt.com.bd</a>.
+              You can request a copy of the data we hold on you, ask us to correct it, or ask us to delete it. Message us on WhatsApp or email <a href="mailto:admin@aipremium.tools" className="text-primary hover:underline">admin@aipremium.tools</a>.
             </p>
           </section>
         </CardContent>
