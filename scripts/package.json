@@ -10,6 +10,7 @@
     "seed-products": "tsx ./src/seed-products.ts",
     "backfill-notion": "tsx ./src/backfill-notion.ts",
     "generate-seo-assets": "tsx ./src/generate-seo-assets.ts",
+    "export-to-d1": "tsx ./src/export-to-d1.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
