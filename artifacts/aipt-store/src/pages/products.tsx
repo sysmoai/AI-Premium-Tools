@@ -48,7 +48,7 @@ export default function Products({ onAddToCart }: ProductsProps) {
     category_id: selectedCategory,
     search: searchQuery || undefined,
   });
-  const { data: categories } = useListCategories();
+  const { data: categories = [] } = useListCategories();
   const { data: allProducts } = useListProducts({ is_active: true });
   const totalCount = allProducts?.length ?? 0;
 

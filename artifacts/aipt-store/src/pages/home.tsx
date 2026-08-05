@@ -48,7 +48,7 @@ const TOOL_CHIPS = [
 export default function Home({ onAddToCart }: HomeProps) {
   const { data: featured, isLoading: featuredLoading } = useListProducts({ featured: true, is_active: true });
   const { data: allProducts } = useListProducts({ is_active: true });
-  const { data: categories, isLoading: catsLoading } = useListCategories();
+  const { data: categories = [], isLoading: catsLoading } = useListCategories();
   const { ref: statRef, inView: statInView } = useInView();
   const { ids: recentIds } = useRecentlyViewed();
   const recentProducts = recentIds

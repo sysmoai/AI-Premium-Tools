@@ -42,7 +42,7 @@ export default function AdminProducts() {
   const [form, setForm] = useState<ProductForm>(emptyForm);
 
   const { data: products, isLoading } = useListProducts({ search: search || undefined });
-  const { data: categories } = useListCategories();
+  const { data: categories = [] } = useListCategories();
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
 

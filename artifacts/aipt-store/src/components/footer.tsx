@@ -45,7 +45,7 @@ const SOCIALS = [
 ];
 
 export default function Footer() {
-  const { data: categories } = useListCategories();
+  const { data: categories = [] } = useListCategories();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
 

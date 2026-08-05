@@ -46,7 +46,7 @@ export default function Navbar({ cartCount }: NavbarProps) {
   const catsRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLFormElement>(null);
 
-  const { data: categories } = useListCategories();
+  const { data: categories = [] } = useListCategories();
   const { data: allProducts } = useListProducts({ is_active: true });
   const trimmedSearch = searchValue.trim().toLowerCase();
   const searchResults = trimmedSearch.length >= 2
