@@ -7,6 +7,13 @@ out-tsc
 *.tsbuildinfo
 .expo
 .expo-shared
+.next/
+.astro/
+
+# environment and secret files
+.env
+.env.*
+!.env.example
 
 # dependencies
 node_modules
