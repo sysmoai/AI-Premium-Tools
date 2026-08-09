@@ -1,23 +1,23 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import type { Request, Response, NextFunction } from "express";
-import { logger } from "../lib/logger";
 
-const SESSION_SECRET = process.env["SESSION_SECRET"] ?? "";
-const ADMIN_PASSWORD = process.env["ADMIN_PASSWORD"] ?? "aipt2024";
+function requireAdminConfig(name: "SESSION_SECRET" | "ADMIN_PASSWORD"): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`${name} must be configured before admin authentication can initialize`);
+  }
+  return value;
+}
 
-if (!SESSION_SECRET) {
-  logger.warn("SESSION_SECRET not set — admin tokens will be unstable across restarts");
-}
-if (!process.env["ADMIN_PASSWORD"]) {
-  logger.warn("ADMIN_PASSWORD not set — falling back to default; set this in Replit Secrets before deploying");
-}
+const SESSION_SECRET = requireAdminConfig("SESSION_SECRET");
+const ADMIN_PASSWORD = requireAdminConfig("ADMIN_PASSWORD");
 
 export function getAdminPassword(): string {
   return ADMIN_PASSWORD;
 }
 
 export function mintAdminToken(): string {
-  return createHmac("sha256", SESSION_SECRET || "fallback-dev-secret")
+  return createHmac("sha256", SESSION_SECRET)
     .update("aipt:admin:v1")
     .digest("hex");
 }
