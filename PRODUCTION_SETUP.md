@@ -35,8 +35,10 @@ queries don't run against it as-is).
   as closely as SQLite's type system allows (booleans as 0/1, timestamps as
   unix-ms integers, `features` as JSON text).
 - `d1/seed.sql` — generated snapshot of categories + products, **not**
-  hand-edited. Regenerate from the local Postgres dev DB after catalog
-  changes:
+  hand-edited. Upserts only (`ON CONFLICT(id) DO UPDATE`) — it never deletes
+  or touches `orders`, `order_items`, `reviews`, or a product's live
+  `order_count`, so it's safe to run against production at any time.
+  Regenerate from the local Postgres dev DB after catalog changes:
   ```
   cd scripts
   DATABASE_URL=postgresql://... pnpm run export-to-d1
