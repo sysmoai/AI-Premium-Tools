@@ -11,7 +11,8 @@
   "private": true,
   "devDependencies": {
     "prettier": "^3.8.1",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "wrangler": "^4.92.0"
   },
   "dependencies": {
     "@notionhq/client": "^5.20.0",
