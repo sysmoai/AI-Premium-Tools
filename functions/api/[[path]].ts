@@ -25,8 +25,8 @@ function errorJson(message: string, status: number): Response {
 // ─── Admin auth (mirrors artifacts/api-server/src/middlewares/admin-auth.ts) ───
 
 function mintAdminToken(env: Env): string {
-  const secret = env.SESSION_SECRET || "fallback-dev-secret";
-  return createHmac("sha256", secret).update("aipt:admin:v1").digest("hex");
+  if (!env.SESSION_SECRET) throw new Error("SESSION_SECRET is not configured");
+  return createHmac("sha256", env.SESSION_SECRET).update("aipt:admin:v1").digest("hex");
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -41,6 +41,7 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 function isAdmin(request: Request, env: Env): boolean {
+  if (!env.SESSION_SECRET) return false;
   const header = request.headers.get("authorization");
   const match = header ? /^Bearer\s+(.+)$/i.exec(header.trim()) : null;
   const token = match ? match[1].trim() : null;
@@ -458,9 +459,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     // admin login
     if (path === "/admin/login" && method === "POST") {
+      if (!env.ADMIN_PASSWORD || !env.SESSION_SECRET) return errorJson("Admin authentication unavailable", 503);
       const b = await request.json<{ password?: string }>();
-      const expected = env.ADMIN_PASSWORD || "aipt2024";
-      if (b.password !== expected) return errorJson("Invalid password", 401);
+      if (b.password !== env.ADMIN_PASSWORD) return errorJson("Invalid password", 401);
       return json({ token: mintAdminToken(env) });
     }
 
