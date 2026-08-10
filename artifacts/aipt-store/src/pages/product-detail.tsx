@@ -43,6 +43,7 @@ import { useSeo } from "@/hooks/use-seo";
 import { SITE_URL } from "@/config/site";
 import { useRecentlyViewed } from "@/hooks/use-recently-viewed";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
+import { ProductMediaGallery } from "@/components/product-media-gallery";
 import { CustomerReviews } from "@/components/customer-reviews";
 import { WHATSAPP_URL } from "@/config/contact";
 
@@ -62,7 +63,6 @@ const TRUST_BADGES = [
   { Icon: RefreshCw, title: "Easy Replacement", desc: "Free swap in warranty" },
   { Icon: Lock, title: "Secure Payment", desc: "bKash · Nagad · Bank" },
 ];
-
 
 function getFaqItems(productName: string, durationDays: number) {
   return [
@@ -430,14 +430,13 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
         <div className="grid md:grid-cols-2 gap-10 lg:gap-14">
           {/* LEFT: Hero + content */}
           <div>
-            <ProductLogoBanner
+            <ProductMediaGallery
+              productId={product.id}
               name={product.name}
               imageUrl={product.image_url}
               gradient={gradient}
-              size="detail"
               isFeatured={product.is_featured ?? false}
               savingsPct={savings}
-              className="mb-6 shadow-2xl rounded-2xl"
             />
 
             <div className="flex flex-wrap gap-2 mb-3">
