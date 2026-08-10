@@ -94,12 +94,12 @@ jobs:
           fi
           echo 'No forbidden environment files are tracked.'
 
-      - name: Aggregate quality gates
-        id: aggregate
+      - name: Report, reconcile incident and enforce quality gates
         if: always()
-        continue-on-error: true
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
           INSTALL_RESULT: ${{ steps.install.outcome }}
           TYPECHECK_RESULT: ${{ steps.typecheck.outcome }}
           TEST_RESULT: ${{ steps.tests.outcome }}
@@ -109,7 +109,9 @@ jobs:
           HYGIENE_RESULT: ${{ steps.hygiene.outcome }}
         run: |
           set -euo pipefail
+          REPORT=/tmp/aipt-hourly-quality.md
           failed=0
+
           for value in \
             "$INSTALL_RESULT" \
             "$TYPECHECK_RESULT" \
@@ -120,14 +122,7 @@ jobs:
             "$HYGIENE_RESULT"; do
             if [ "$value" != 'success' ]; then failed=1; fi
           done
-          exit "$failed"
 
-      - name: Build quality report
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          REPORT=/tmp/aipt-hourly-quality.md
           {
             echo '# AIPT hourly code/security quality watch'
             echo
@@ -135,46 +130,35 @@ jobs:
             echo
             echo '| Gate | Result |'
             echo '|---|---|'
-            echo '| Install | ${{ steps.install.outcome }} |'
-            echo '| Typecheck | ${{ steps.typecheck.outcome }} |'
-            echo '| Tests | ${{ steps.tests.outcome }} |'
-            echo '| Local D1 migrations | ${{ steps.migrations.outcome }} |'
-            echo '| Production build | ${{ steps.build.outcome }} |'
-            echo '| High/critical dependency audit | ${{ steps.audit.outcome }} |'
-            echo '| Secret-hygiene guard | ${{ steps.hygiene.outcome }} |'
-            echo '| Aggregate | ${{ steps.aggregate.outcome }} |'
+            echo "| Install | ${INSTALL_RESULT} |"
+            echo "| Typecheck | ${TYPECHECK_RESULT} |"
+            echo "| Tests | ${TEST_RESULT} |"
+            echo "| Local D1 migrations | ${MIGRATION_RESULT} |"
+            echo "| Production build | ${BUILD_RESULT} |"
+            echo "| High/critical dependency audit | ${AUDIT_RESULT} |"
+            echo "| Secret-hygiene guard | ${HYGIENE_RESULT} |"
+            echo
+            if [ "$failed" -eq 0 ]; then
+              echo '**HEALTHY — every hourly code/security quality gate passed.**'
+            else
+              echo '**UNHEALTHY — one or more hourly code/security quality gates failed.**'
+            fi
             echo
             echo 'This watchdog never deploys. It detects regressions on main between feature deployments.'
           } | tee "$REPORT" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Open or refresh code-quality incident
-        if: always() && github.event_name != 'pull_request' && steps.aggregate.outcome == 'failure'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          TITLE='[watch] AIPT code/security quality incident'
-          NUMBER=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"${TITLE}\") | .number" | head -n 1)
-          if [ -n "$NUMBER" ]; then
-            gh issue edit "$NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/aipt-hourly-quality.md
-          else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file /tmp/aipt-hourly-quality.md
+          if [ "$EVENT_NAME" != 'pull_request' ]; then
+            TITLE='[watch] AIPT code/security quality incident'
+            NUMBER=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"${TITLE}\") | .number" | head -n 1)
+            if [ "$failed" -ne 0 ]; then
+              if [ -n "$NUMBER" ]; then
+                gh issue edit "$NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$REPORT"
+              else
+                gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file "$REPORT"
+              fi
+            elif [ -n "$NUMBER" ]; then
+              gh issue close "$NUMBER" --repo "$GITHUB_REPOSITORY" --comment 'Automatically closed after all hourly code/security quality gates returned green.'
+            fi
           fi
 
-      - name: Close recovered code-quality incident
-        if: always() && github.event_name != 'pull_request' && steps.aggregate.outcome == 'success'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          TITLE='[watch] AIPT code/security quality incident'
-          NUMBER=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"${TITLE}\") | .number" | head -n 1)
-          if [ -n "$NUMBER" ]; then
-            gh issue close "$NUMBER" --repo "$GITHUB_REPOSITORY" --comment 'Automatically closed after all hourly code/security quality gates returned green.'
-          fi
-
-      - name: Fail when a quality gate failed
-        if: always() && steps.aggregate.outcome == 'failure'
-        run: exit 1
+          exit "$failed"
