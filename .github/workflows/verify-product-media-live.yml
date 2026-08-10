@@ -1,0 +1,239 @@
+name: Verify AIPT Product Media Live
+
+on:
+  push:
+    branches: [ops/verify-product-media-live]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: aipt-product-media-live-verification
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Validate current main-compatible code
+        shell: bash
+        env:
+          PORT: '8080'
+          BASE_PATH: '/'
+          VITE_SITE_URL: 'https://aipremium.tools'
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm run typecheck
+          pnpm --filter @workspace/aipt-store run test
+          pnpm --filter @workspace/aipt-store run build
+          printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > /tmp/aipt-product-media-a.png
+          cp /tmp/aipt-product-media-a.png /tmp/aipt-product-media-b.png
+
+      - name: Create isolated production-bound verification preview
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RAW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EXPECTED_D1_DATABASE_ID: '9c19dfdb-aead-4bed-b6ff-f6bf379bc296'
+          EXPECTED_R2_BUCKET: 'aipt-media'
+          PROJECT_NAME: 'ai-premium-tools'
+          TEST_BRANCH: 'aipt-product-media-ci-verify'
+        run: |
+          set -euo pipefail
+          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim();if(!v)process.exit(1);process.stdout.write(v)')
+          account_id=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_ACCOUNT_ID||"").trim();if(!v)process.exit(1);process.stdout.write(v)')
+          session_secret=$(node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("hex"))')
+          admin_password=$(node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("hex"))')
+          cleanup_nonce=$(node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("hex"))')
+          admin_token=$(SESSION_SECRET="$session_secret" node -e 'const c=require("crypto");process.stdout.write(c.createHmac("sha256",process.env.SESSION_SECRET).update("aipt:admin:v1").digest("hex"))')
+          for value in "$session_secret" "$admin_password" "$cleanup_nonce" "$admin_token"; do echo "::add-mask::$value"; done
+
+          project_url="https://api.cloudflare.com/client/v4/accounts/${account_id}/pages/projects/${PROJECT_NAME}"
+          deployments_url="${project_url}/deployments"
+          curl --fail --silent --show-error --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' "$project_url" > /tmp/project-before.json
+          EXPECTED_D1_DATABASE_ID="$EXPECTED_D1_DATABASE_ID" EXPECTED_R2_BUCKET="$EXPECTED_R2_BUCKET" node <<'NODE'
+          const x=require('/tmp/project-before.json');
+          const prod=x.result?.deployment_configs?.production||{};
+          const prev=x.result?.deployment_configs?.preview||{};
+          if(prod.d1_databases?.DB?.id!==process.env.EXPECTED_D1_DATABASE_ID) throw new Error('Production D1 identity mismatch');
+          if(prod.r2_buckets?.MEDIA?.name!==process.env.EXPECTED_R2_BUCKET) throw new Error('Production R2 identity mismatch');
+          const temporary=[prev.d1_databases?.DB?.id,prev.r2_buckets?.MEDIA?.name,prev.env_vars?.SESSION_SECRET,prev.env_vars?.ADMIN_PASSWORD,prev.env_vars?.AIPT_PRODUCT_MEDIA_TEST_NONCE];
+          if(temporary.some(v=>v!=null)) throw new Error('Preview temporary capability already present');
+          console.log('Verified exact production D1/R2 identities and clean preview state');
+          NODE
+
+          echo "AIPT_PM_PREVIEW_OWNED=1" >> "$GITHUB_ENV"
+          echo "AIPT_PM_ACCOUNT_ID=$account_id" >> "$GITHUB_ENV"
+          echo "AIPT_PM_TOKEN=$token" >> "$GITHUB_ENV"
+          echo "AIPT_PM_ADMIN_TOKEN=$admin_token" >> "$GITHUB_ENV"
+          echo "AIPT_PM_CLEANUP_NONCE=$cleanup_nonce" >> "$GITHUB_ENV"
+          echo "AIPT_PM_TEST_BRANCH=$TEST_BRANCH" >> "$GITHUB_ENV"
+          echo "AIPT_PM_PROJECT_NAME=$PROJECT_NAME" >> "$GITHUB_ENV"
+
+          cp scripts/ops/product-media-live-cleanup.ts functions/__aipt_internal_cleanup_product_media.ts
+          payload=$(EXPECTED_D1_DATABASE_ID="$EXPECTED_D1_DATABASE_ID" EXPECTED_R2_BUCKET="$EXPECTED_R2_BUCKET" SESSION_SECRET="$session_secret" ADMIN_PASSWORD="$admin_password" NONCE="$cleanup_nonce" node -e 'process.stdout.write(JSON.stringify({deployment_configs:{preview:{d1_databases:{DB:{id:process.env.EXPECTED_D1_DATABASE_ID}},r2_buckets:{MEDIA:{name:process.env.EXPECTED_R2_BUCKET}},env_vars:{SESSION_SECRET:{type:"secret_text",value:process.env.SESSION_SECRET},ADMIN_PASSWORD:{type:"secret_text",value:process.env.ADMIN_PASSWORD},AIPT_PRODUCT_MEDIA_TEST_NONCE:{type:"secret_text",value:process.env.NONCE}}}}}))')
+          curl --fail --silent --show-error --request PATCH --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' --data "$payload" "$project_url" > /tmp/configured.json
+          echo "AIPT_PM_PREVIEW_CONFIGURED=1" >> "$GITHUB_ENV"
+
+          mv wrangler.toml /tmp/aipt-wrangler.toml
+          started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          set +e
+          CLOUDFLARE_API_TOKEN="$token" CLOUDFLARE_ACCOUNT_ID="$account_id" pnpm exec wrangler pages deploy artifacts/aipt-store/dist/public --project-name="$PROJECT_NAME" --branch="$TEST_BRANCH" > /tmp/deploy.txt 2>&1
+          code=$?
+          set -e
+          mv /tmp/aipt-wrangler.toml wrangler.toml
+          if [ $code -ne 0 ]; then sed -n '1,100p' /tmp/deploy.txt | sed -E 's#https://[^ ]+#<preview-url>#g'; exit 1; fi
+
+          curl --fail --silent --show-error --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' "$deployments_url" > /tmp/deployments.json
+          TEST_BRANCH="$TEST_BRANCH" STARTED="$started" node <<'NODE' > /tmp/deployment-values.txt
+          const x=require('/tmp/deployments.json');const start=Date.parse(process.env.STARTED);
+          const m=(x.result||[]).filter(d=>d.environment==='preview'&&d.deployment_trigger?.metadata?.branch===process.env.TEST_BRANCH&&Date.parse(d.created_on)>=start-10000).sort((a,b)=>Date.parse(b.created_on)-Date.parse(a.created_on));
+          if(!m.length)throw new Error('Could not identify product-media verification deployment');
+          const d=m[0],url=String(d.url||'').replace(/\/$/,'');if(!/^https:\/\/[a-z0-9-]+\.ai-premium-tools\.pages\.dev$/i.test(url))throw new Error('Unexpected preview URL');
+          process.stdout.write(`${d.id}\n${url}\n`);
+          NODE
+          echo "AIPT_PM_DEPLOYMENT_ID=$(sed -n '1p' /tmp/deployment-values.txt)" >> "$GITHUB_ENV"
+          echo "AIPT_PM_URL=$(sed -n '2p' /tmp/deployment-values.txt)" >> "$GITHUB_ENV"
+          echo "Isolated product-media verification preview ready"
+
+      - name: Select a product with no existing media relationships
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error "${AIPT_PM_URL}/api/products" > /tmp/products.json
+          node -e 'const x=require("/tmp/products.json");for(const p of x.slice().sort((a,b)=>a.id-b.id))console.log(p.id)' > /tmp/product-ids.txt
+          selected=""
+          while IFS= read -r id; do
+            curl --fail --silent --show-error "${AIPT_PM_URL}/api/products/${id}/media" > /tmp/product-media.json
+            count=$(node -e 'const x=require("/tmp/product-media.json");process.stdout.write(String((x.items||[]).length))')
+            if [ "$count" = "0" ]; then selected="$id"; break; fi
+          done < /tmp/product-ids.txt
+          [ -n "$selected" ] || { echo "No product with an empty media relationship set is available; refusing mutation test"; exit 1; }
+          echo "AIPT_PM_PRODUCT_ID=$selected" >> "$GITHUB_ENV"
+          curl --fail --silent --show-error "${AIPT_PM_URL}/api/products/${selected}" > /tmp/product-before.json
+          node -e 'const x=require("/tmp/product-before.json");process.stdout.write(JSON.stringify({id:x.id,image_url:x.image_url??null,updated_at:x.updated_at??null}))' > /tmp/product-before-snapshot.json
+          echo "Selected product #${selected} only after verifying its media relationship set is empty"
+
+      - name: Upload two disposable relationship-test images
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --header "Authorization: Bearer ${AIPT_PM_ADMIN_TOKEN}" --form 'file=@/tmp/aipt-product-media-a.png;type=image/png;filename=aipt-product-media-ci-a.png' --form 'alt_text=AIPT disposable product media verification' "${AIPT_PM_URL}/api/media/upload" > /tmp/media-a.json
+          curl --fail --silent --show-error --header "Authorization: Bearer ${AIPT_PM_ADMIN_TOKEN}" --form 'file=@/tmp/aipt-product-media-b.png;type=image/png;filename=aipt-product-media-ci-b.png' --form 'alt_text=AIPT disposable product media verification' "${AIPT_PM_URL}/api/media/upload" > /tmp/media-b.json
+          node -e 'for(const f of ["/tmp/media-a.json","/tmp/media-b.json"]){const x=require(f);if(!Number.isInteger(Number(x.id))||x.asset_type!=="image"||!String(x.key||"").startsWith("library/"))throw new Error(`Unexpected disposable upload: ${f}`)}'
+          echo "AIPT_PM_MEDIA_A_ID=$(node -p 'require("/tmp/media-a.json").id')" >> "$GITHUB_ENV"
+          echo "AIPT_PM_MEDIA_A_KEY=$(node -p 'require("/tmp/media-a.json").key')" >> "$GITHUB_ENV"
+          echo "AIPT_PM_MEDIA_B_ID=$(node -p 'require("/tmp/media-b.json").id')" >> "$GITHUB_ENV"
+          echo "AIPT_PM_MEDIA_B_KEY=$(node -p 'require("/tmp/media-b.json").key')" >> "$GITHUB_ENV"
+          echo "Uploaded two uniquely marked disposable media assets"
+
+      - name: Verify relationship write guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload=$(A="$AIPT_PM_MEDIA_A_ID" node -e 'process.stdout.write(JSON.stringify({items:[{media_asset_id:Number(process.env.A),role:"gallery",sort_order:0,is_primary:false}]}))')
+          code=$(curl --silent --show-error --output /tmp/unauthorized.json --write-out '%{http_code}' --request PUT --header 'Content-Type: application/json' --data "$payload" "${AIPT_PM_URL}/api/products/${AIPT_PM_PRODUCT_ID}/media")
+          [ "$code" = "401" ] || { echo "Expected unauthorized relationship write 401, got $code"; exit 1; }
+
+          bad=$(A="$AIPT_PM_MEDIA_A_ID" B="$AIPT_PM_MEDIA_B_ID" node -e 'process.stdout.write(JSON.stringify({items:[{media_asset_id:Number(process.env.A),role:"primary",sort_order:0,is_primary:true},{media_asset_id:Number(process.env.B),role:"primary",sort_order:1,is_primary:true}]}))')
+          code=$(curl --silent --show-error --output /tmp/two-primary.json --write-out '%{http_code}' --request PUT --header "Authorization: Bearer ${AIPT_PM_ADMIN_TOKEN}" --header 'Content-Type: application/json' --data "$bad" "${AIPT_PM_URL}/api/products/${AIPT_PM_PRODUCT_ID}/media")
+          [ "$code" = "400" ] || { echo "Expected two-primary relationship write 400, got $code"; exit 1; }
+          curl --fail --silent --show-error "${AIPT_PM_URL}/api/products/${AIPT_PM_PRODUCT_ID}/media" > /tmp/after-invalid.json
+          node -e 'const x=require("/tmp/after-invalid.json");if((x.items||[]).length!==0)throw new Error("Rejected relationship mutation changed data")'
+          echo "Verified unauthorized and invalid relationship writes fail closed without mutation"
+
+      - name: Attach, read and order disposable product media
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload=$(A="$AIPT_PM_MEDIA_A_ID" B="$AIPT_PM_MEDIA_B_ID" node -e 'process.stdout.write(JSON.stringify({items:[{media_asset_id:Number(process.env.B),role:"thumbnail",sort_order:0,is_primary:false},{media_asset_id:Number(process.env.A),role:"gallery",sort_order:1,is_primary:false}]}))')
+          curl --fail --silent --show-error --request PUT --header "Authorization: Bearer ${AIPT_PM_ADMIN_TOKEN}" --header 'Content-Type: application/json' --data "$payload" "${AIPT_PM_URL}/api/products/${AIPT_PM_PRODUCT_ID}/media" > /tmp/attach.json
+          A="$AIPT_PM_MEDIA_A_ID" B="$AIPT_PM_MEDIA_B_ID" node -e 'const x=require("/tmp/attach.json");const i=x.items||[];if(i.length!==2)throw new Error("Expected two attached items");if(Number(i[0].media_asset_id)!==Number(process.env.B)||i[0].role!=="thumbnail"||Number(i[0].sort_order)!==0)throw new Error("First attachment ordering/role mismatch");if(Number(i[1].media_asset_id)!==Number(process.env.A)||i[1].role!=="gallery"||Number(i[1].sort_order)!==1)throw new Error("Second attachment ordering/role mismatch");if(i.some(v=>v.is_primary))throw new Error("No test media should be primary")'
+          curl --fail --silent --show-error "${AIPT_PM_URL}/api/products/${AIPT_PM_PRODUCT_ID}/media" > /tmp/read-after-attach.json
+          cmp <(node -e 'const x=require("/tmp/attach.json");process.stdout.write(JSON.stringify(x.items))') <(node -e 'const x=require("/tmp/read-after-attach.json");process.stdout.write(JSON.stringify(x.items))')
+          curl --fail --silent --show-error "${AIPT_PM_URL}/api/products/${AIPT_PM_PRODUCT_ID}" > /tmp/product-during.json
+          node -e 'const fs=require("fs");const before=JSON.parse(fs.readFileSync("/tmp/product-before-snapshot.json","utf8"));const x=require("/tmp/product-during.json");if((x.image_url??null)!==before.image_url)throw new Error("Legacy image_url changed despite no primary media");if((x.updated_at??null)!==before.updated_at)throw new Error("updated_at changed despite no primary media");console.log("Verified relationship read/order/roles and unchanged product image fields")'
+          echo "AIPT_PM_ATTACHED=1" >> "$GITHUB_ENV"
+
+      - name: Restore product to exact empty relationship state
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --request PUT --header "Authorization: Bearer ${AIPT_PM_ADMIN_TOKEN}" --header 'Content-Type: application/json' --data '{"items":[]}' "${AIPT_PM_URL}/api/products/${AIPT_PM_PRODUCT_ID}/media" > /tmp/restored.json
+          node -e 'const x=require("/tmp/restored.json");if((x.items||[]).length!==0)throw new Error("Relationship restore did not return empty set")'
+          curl --fail --silent --show-error "${AIPT_PM_URL}/api/products/${AIPT_PM_PRODUCT_ID}/media" > /tmp/read-restored.json
+          node -e 'const x=require("/tmp/read-restored.json");if((x.items||[]).length!==0)throw new Error("Product media was not restored to empty")'
+          curl --fail --silent --show-error "${AIPT_PM_URL}/api/products/${AIPT_PM_PRODUCT_ID}" > /tmp/product-after.json
+          node -e 'const fs=require("fs");const before=JSON.parse(fs.readFileSync("/tmp/product-before-snapshot.json","utf8"));const x=require("/tmp/product-after.json");if((x.image_url??null)!==before.image_url||(x.updated_at??null)!==before.updated_at)throw new Error("Product image fields differ after relationship restoration");console.log("Verified product restored exactly")'
+          echo "AIPT_PM_ATTACHED=0" >> "$GITHUB_ENV"
+
+      - name: Delete exact disposable media assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          body=$(A_ID="$AIPT_PM_MEDIA_A_ID" A_KEY="$AIPT_PM_MEDIA_A_KEY" B_ID="$AIPT_PM_MEDIA_B_ID" B_KEY="$AIPT_PM_MEDIA_B_KEY" node -e 'process.stdout.write(JSON.stringify({items:[{id:Number(process.env.A_ID),key:process.env.A_KEY},{id:Number(process.env.B_ID),key:process.env.B_KEY}]}))')
+          curl --fail --silent --show-error --request POST --header "Authorization: Bearer ${AIPT_PM_CLEANUP_NONCE}" --header 'Content-Type: application/json' --data "$body" "${AIPT_PM_URL}/__aipt_internal_cleanup_product_media" > /tmp/cleanup-media.json
+          node -e 'const x=require("/tmp/cleanup-media.json");if(!x.ok||x.deleted?.length!==2)throw new Error("Exact disposable cleanup failed");console.log("Verified exact disposable R2 objects and D1 media rows deleted")'
+          echo "AIPT_PM_ASSETS_CLEANED=1" >> "$GITHUB_ENV"
+
+      - name: Guaranteed restoration and preview cleanup
+        if: always()
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RAW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT_NAME: 'ai-premium-tools'
+          TEST_BRANCH: 'aipt-product-media-ci-verify'
+        run: |
+          set -u
+          result=0
+          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim();if(!v)process.exit(1);process.stdout.write(v)') || exit 1
+          account_id=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_ACCOUNT_ID||"").trim();if(!v)process.exit(1);process.stdout.write(v)') || exit 1
+          project_url="https://api.cloudflare.com/client/v4/accounts/${account_id}/pages/projects/${PROJECT_NAME}"
+          deployments_url="${project_url}/deployments"
+          cf_get(){ curl --fail --silent --show-error --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' "$1"; }
+          cf_patch(){ curl --fail --silent --show-error --request PATCH --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' --data "$2" "$1"; }
+
+          if [ "${AIPT_PM_PREVIEW_OWNED:-0}" = "1" ]; then
+            if [ -n "${AIPT_PM_URL:-}" ] && [ -n "${AIPT_PM_PRODUCT_ID:-}" ] && [ -n "${AIPT_PM_ADMIN_TOKEN:-}" ]; then
+              code=$(curl --silent --show-error --output /tmp/final-restore.json --write-out '%{http_code}' --request PUT --header "Authorization: Bearer ${AIPT_PM_ADMIN_TOKEN}" --header 'Content-Type: application/json' --data '{"items":[]}' "${AIPT_PM_URL}/api/products/${AIPT_PM_PRODUCT_ID}/media" || true)
+              if [ "$code" != "200" ]; then echo "ERROR: guaranteed product-media restoration failed HTTP $code"; result=1; else echo "Guaranteed product-media relationship restoration succeeded"; fi
+            fi
+
+            if [ "${AIPT_PM_ASSETS_CLEANED:-0}" != "1" ] && [ -n "${AIPT_PM_URL:-}" ] && [ -n "${AIPT_PM_CLEANUP_NONCE:-}" ] && [ -n "${AIPT_PM_MEDIA_A_ID:-}${AIPT_PM_MEDIA_B_ID:-}" ]; then
+              body=$(A_ID="${AIPT_PM_MEDIA_A_ID:-}" A_KEY="${AIPT_PM_MEDIA_A_KEY:-}" B_ID="${AIPT_PM_MEDIA_B_ID:-}" B_KEY="${AIPT_PM_MEDIA_B_KEY:-}" node -e 'const items=[];if(process.env.A_ID&&process.env.A_KEY)items.push({id:Number(process.env.A_ID),key:process.env.A_KEY});if(process.env.B_ID&&process.env.B_KEY)items.push({id:Number(process.env.B_ID),key:process.env.B_KEY});process.stdout.write(JSON.stringify({items}))')
+              code=$(curl --silent --show-error --output /tmp/final-media-cleanup.json --write-out '%{http_code}' --request POST --header "Authorization: Bearer ${AIPT_PM_CLEANUP_NONCE}" --header 'Content-Type: application/json' --data "$body" "${AIPT_PM_URL}/__aipt_internal_cleanup_product_media" || true)
+              if [ "$code" != "200" ]; then echo "ERROR: guaranteed disposable media cleanup failed HTTP $code"; result=1; else echo "Guaranteed disposable media cleanup succeeded"; fi
+            fi
+
+            cf_patch "$project_url" '{"deployment_configs":{"preview":{"d1_databases":{"DB":null},"r2_buckets":{"MEDIA":null},"env_vars":{"SESSION_SECRET":null,"ADMIN_PASSWORD":null,"AIPT_PRODUCT_MEDIA_TEST_NONCE":null}}}}' > /tmp/remove-preview.json || result=1
+            rm -f functions/__aipt_internal_cleanup_product_media.ts
+
+            if [ -d artifacts/aipt-store/dist/public ]; then
+              mv wrangler.toml /tmp/aipt-wrangler.toml 2>/dev/null || true
+              CLOUDFLARE_API_TOKEN="$token" CLOUDFLARE_ACCOUNT_ID="$account_id" pnpm exec wrangler pages deploy artifacts/aipt-store/dist/public --project-name="$PROJECT_NAME" --branch="$TEST_BRANCH" > /tmp/clean-deploy.txt 2>&1 || result=1
+              mv /tmp/aipt-wrangler.toml wrangler.toml 2>/dev/null || true
+            fi
+
+            cf_get "$deployments_url" > /tmp/deployments-clean.json || result=1
+            if [ -f /tmp/deployments-clean.json ]; then
+              TEST_BRANCH="$TEST_BRANCH" node <<'NODE' > /tmp/delete-ids.txt || result=1
+          const x=require('/tmp/deployments-clean.json');const m=(x.result||[]).filter(d=>d.environment==='preview'&&d.deployment_trigger?.metadata?.branch===process.env.TEST_BRANCH).sort((a,b)=>Date.parse(b.created_on)-Date.parse(a.created_on));if(!m.length)throw new Error('No clean product-media verification preview found');const n=m[0];for(const v of [n.d1_databases?.DB?.id,n.r2_buckets?.MEDIA?.name,n.env_vars?.SESSION_SECRET,n.env_vars?.ADMIN_PASSWORD,n.env_vars?.AIPT_PRODUCT_MEDIA_TEST_NONCE])if(v!=null)throw new Error('Newest product-media preview still has temporary capabilities');for(const d of m.slice(1))console.log(d.id);
+          NODE
+              while IFS= read -r id; do [ -z "$id" ]&&continue; code=$(curl --silent --show-error --output /tmp/delete.json --write-out '%{http_code}' --request DELETE --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' "${deployments_url}/${id}?force=true" || true); if [ "$code" != "200" ]&&[ "$code" != "204" ]; then result=1; fi; done < /tmp/delete-ids.txt
+            fi
+
+            cf_get "$project_url" > /tmp/project-clean.json || result=1
+            if [ -f /tmp/project-clean.json ]; then node -e 'const x=require("/tmp/project-clean.json");const p=x.result?.deployment_configs?.preview||{};for(const v of [p.d1_databases?.DB?.id,p.r2_buckets?.MEDIA?.name,p.env_vars?.SESSION_SECRET,p.env_vars?.ADMIN_PASSWORD,p.env_vars?.AIPT_PRODUCT_MEDIA_TEST_NONCE])if(v!=null)throw new Error("Temporary preview capability remains");console.log("Verified all product-media test preview capabilities removed")' || result=1; fi
+          fi
+          unset token account_id
+          exit "$result"
