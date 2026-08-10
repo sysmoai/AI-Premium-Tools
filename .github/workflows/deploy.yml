@@ -83,7 +83,6 @@ jobs:
           set -euo pipefail
           node <<'NODE'
           const fs = require('fs');
-          const path = require('path');
           const expected = ['0001_baseline.sql', '0002_catalog_media_foundation.sql'];
           const files = fs.readdirSync('d1/migrations').filter((name) => name.endsWith('.sql')).sort();
           const target = fs.readFileSync('d1/PRODUCTION_MIGRATION_TARGET', 'utf8').trim();
@@ -127,6 +126,7 @@ jobs:
           rm -f /tmp/aipt-pages-project.json
 
       - name: Deploy to Cloudflare Pages
+        id: deploy-pages
         shell: bash
         env:
           RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -136,18 +136,70 @@ jobs:
           token=$(node -e 'const value=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim(); if(!value) process.exit(1); process.stdout.write(value)')
           account_id=$(node -e 'const value=(process.env.RAW_CLOUDFLARE_ACCOUNT_ID||"").trim(); if(!value) process.exit(1); process.stdout.write(value)')
           CLOUDFLARE_API_TOKEN="$token" CLOUDFLARE_ACCOUNT_ID="$account_id" \
-            pnpm exec wrangler pages deploy artifacts/aipt-store/dist/public --project-name=ai-premium-tools
+            pnpm exec wrangler pages deploy artifacts/aipt-store/dist/public --project-name=ai-premium-tools 2>&1 | tee /tmp/aipt-pages-deploy.log
+          deployment_url=$(grep -Eo 'https://[a-z0-9-]+\.ai-premium-tools\.pages\.dev' /tmp/aipt-pages-deploy.log | tail -n 1)
+          if [ -z "$deployment_url" ]; then
+            echo 'Could not determine the immutable Pages deployment URL'
+            exit 1
+          fi
+          echo "DEPLOYMENT_URL=$deployment_url" >> "$GITHUB_ENV"
+          echo "Deployment URL: $deployment_url"
           unset token account_id
+          rm -f /tmp/aipt-pages-deploy.log
 
-      - name: Verify canonical production
+      - name: Verify immutable Pages deployment
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --retry 8 --retry-delay 3 https://aipremium.tools/ > /dev/null
-          curl --fail --silent --show-error --retry 8 --retry-delay 3 https://aipremium.tools/api/healthz | grep -q '"status":"ok"'
-          curl --fail --silent --show-error --retry 8 --retry-delay 3 https://aipremium.tools/api/products > /tmp/aipt-products.json
-          node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("/tmp/aipt-products.json","utf8")); if(!Array.isArray(x) || x.length===0) process.exit(1); console.log(`Verified ${x.length} products from production API`);'
-          curl --fail --silent --show-error --retry 8 --retry-delay 3 https://aipremium.tools/api/db-schema > /tmp/aipt-db-schema.json
+          echo "Waiting for $DEPLOYMENT_URL to become healthy..."
+          healthy=0
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error --max-time 15 "$DEPLOYMENT_URL/api/healthz" | grep -q '"status":"ok"'; then
+              healthy=1
+              echo "Immutable deployment healthy on attempt $attempt"
+              break
+            fi
+            sleep 2
+          done
+          if [ "$healthy" -ne 1 ]; then
+            echo 'Fresh Pages deployment did not become healthy within 60 seconds'
+            exit 1
+          fi
+          curl --fail --silent --show-error "$DEPLOYMENT_URL/" > /dev/null
+          curl --fail --silent --show-error "$DEPLOYMENT_URL/api/products" > /tmp/aipt-deployment-products.json
+          node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("/tmp/aipt-deployment-products.json","utf8")); if(!Array.isArray(x) || x.length===0) process.exit(1); console.log(`Verified ${x.length} products on immutable deployment`);'
+          curl --fail --silent --show-error "$DEPLOYMENT_URL/api/db-schema" > /tmp/aipt-deployment-schema.json
+          node <<'NODE'
+          const x = require('/tmp/aipt-deployment-schema.json');
+          if (x?.status !== 'ok' || x?.migration !== '0002_catalog_media_foundation.sql') throw new Error('Immutable deployment D1 schema health check failed');
+          if (!x?.checks?.migrations || !x?.checks?.catalog_media_tables || !x?.checks?.product_columns) throw new Error('Immutable deployment D1 schema invariants failed');
+          NODE
+          rm -f /tmp/aipt-deployment-products.json /tmp/aipt-deployment-schema.json
+
+      - name: Verify canonical production after propagation
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'Waiting for canonical Cloudflare edge propagation (bounded to 5 minutes)...'
+          propagated=0
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error --max-time 15 https://aipremium.tools/api/healthz | grep -q '"status":"ok"'; then
+              propagated=1
+              echo "Canonical health reached the new healthy runtime on attempt $attempt"
+              break
+            fi
+            sleep 5
+          done
+          if [ "$propagated" -ne 1 ]; then
+            echo 'Canonical domain did not become healthy within the 5-minute propagation window'
+            exit 1
+          fi
+
+          curl --fail --silent --show-error https://aipremium.tools/ > /dev/null
+          curl --fail --silent --show-error https://aipremium.tools/checkout > /dev/null
+          curl --fail --silent --show-error https://aipremium.tools/api/products > /tmp/aipt-products.json
+          node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("/tmp/aipt-products.json","utf8")); if(!Array.isArray(x) || x.length===0) process.exit(1); console.log(`Verified ${x.length} products from canonical production API`);'
+          curl --fail --silent --show-error https://aipremium.tools/api/db-schema > /tmp/aipt-db-schema.json
           node <<'NODE'
           const x = require('/tmp/aipt-db-schema.json');
           if (x?.status !== 'ok') throw new Error(`Production D1 schema health is ${String(x?.status)}`);
@@ -155,5 +207,6 @@ jobs:
           if (!x?.checks?.migrations || !x?.checks?.catalog_media_tables || !x?.checks?.product_columns) {
             throw new Error('One or more production D1 schema checks failed');
           }
-          console.log(`Verified production D1 schema at ${x.migration}`);
+          console.log(`Verified canonical production D1 schema at ${x.migration}`);
           NODE
+          rm -f /tmp/aipt-products.json /tmp/aipt-db-schema.json
