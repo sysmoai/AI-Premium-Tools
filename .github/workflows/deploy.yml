@@ -87,13 +87,16 @@ jobs:
           set -euo pipefail
           node -e 'const id=process.env.CLOUDFLARE_ACCOUNT_ID||""; if(!/^[0-9a-f]{32}$/i.test(id)){ console.error(`CLOUDFLARE_ACCOUNT_ID format is invalid (length=${id.length}; expected 32 hexadecimal characters)`); process.exit(1); } console.log("CLOUDFLARE_ACCOUNT_ID format is valid (32 hexadecimal characters)");'
 
+          normalized_token=$(node -e 'const raw=process.env.CLOUDFLARE_API_TOKEN||""; const clean=raw.trim(); if(!clean){console.error("CLOUDFLARE_API_TOKEN is empty after normalization");process.exit(1)} if(clean.length!==raw.length) console.error("CLOUDFLARE_API_TOKEN contains surrounding whitespace; using normalized value for this read-only preflight"); process.stdout.write(clean)')
+
           status=$(curl --silent --show-error \
             --output /tmp/aipt-pages-project.json \
             --write-out '%{http_code}' \
-            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            --header "Authorization: Bearer ${normalized_token}" \
             --header "Content-Type: application/json" \
             "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/ai-premium-tools")
           printf '%s' "$status" > /tmp/aipt-pages-status.txt
+          unset normalized_token
 
           node <<'NODE'
           const fs = require('fs');
