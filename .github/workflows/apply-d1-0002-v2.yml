@@ -1,0 +1,255 @@
+name: Apply AIPT D1 Migration 0002 v2
+
+on:
+  push:
+    branches: [ops/apply-d1-migration-0002-v2]
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: aipt-d1-migration
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate repository before migration
+        shell: bash
+        env:
+          PORT: '8080'
+          BASE_PATH: '/'
+          VITE_SITE_URL: 'https://aipremium.tools'
+        run: |
+          set -euo pipefail
+          pnpm run typecheck
+          pnpm --filter @workspace/aipt-store run test
+          rm -rf .wrangler/state
+          pnpm exec wrangler d1 migrations apply aipt-db --local
+          pnpm --filter @workspace/aipt-store run build
+
+      - name: Guarded preview-bound production migration
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RAW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EXPECTED_D1_DATABASE_ID: '9c19dfdb-aead-4bed-b6ff-f6bf379bc296'
+          PROJECT_NAME: 'ai-premium-tools'
+          MIGRATION_BRANCH: 'aipt-db-migration-0002'
+        run: |
+          set -euo pipefail
+
+          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
+          account_id=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_ACCOUNT_ID||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
+          nonce=$(node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("hex"))')
+          echo "::add-mask::$nonce"
+          project_url="https://api.cloudflare.com/client/v4/accounts/${account_id}/pages/projects/${PROJECT_NAME}"
+          deployments_url="${project_url}/deployments"
+          preview_config_modified=0
+          migration_deployment_seen=0
+
+          cf_get() {
+            curl --fail --silent --show-error \
+              --header "Authorization: Bearer ${token}" \
+              --header "Content-Type: application/json" \
+              "$1"
+          }
+
+          cf_patch() {
+            curl --fail --silent --show-error \
+              --request PATCH \
+              --header "Authorization: Bearer ${token}" \
+              --header "Content-Type: application/json" \
+              --data "$2" \
+              "$1"
+          }
+
+          deploy_preview() {
+            CLOUDFLARE_API_TOKEN="$token" CLOUDFLARE_ACCOUNT_ID="$account_id" \
+              pnpm exec wrangler pages deploy artifacts/aipt-store/dist/public \
+              --project-name="$PROJECT_NAME" --branch="$MIGRATION_BRANCH"
+          }
+
+          cleanup() {
+            original_exit=$?
+            set +e
+            echo "Starting guaranteed preview cleanup"
+
+            if [ "$preview_config_modified" = "1" ]; then
+              cf_patch "$project_url" '{"deployment_configs":{"preview":{"d1_databases":{"DB":null},"env_vars":{"AIPT_MIGRATION_NONCE":null}}}}' \
+                > /tmp/aipt-cleanup-config.json
+            fi
+
+            rm -f functions/__aipt_internal_migrate_0002.ts
+
+            # If a migration deployment may exist, publish a clean replacement
+            # after removing preview DB/secret config, then remove all older
+            # deployments from the dedicated migration branch.
+            if [ "$migration_deployment_seen" = "1" ]; then
+              mv wrangler.toml /tmp/aipt-wrangler.toml 2>/dev/null || true
+              deploy_preview > /tmp/aipt-clean-preview-deploy.txt 2>&1
+              clean_deploy_status=$?
+              mv /tmp/aipt-wrangler.toml wrangler.toml 2>/dev/null || true
+              if [ $clean_deploy_status -ne 0 ]; then
+                echo "ERROR: clean preview redeploy failed"
+                original_exit=1
+              else
+                echo "Clean preview redeployed"
+                cf_get "${deployments_url}?env=preview&per_page=100" > /tmp/aipt-clean-deployments.json
+                MIGRATION_BRANCH="$MIGRATION_BRANCH" node <<'NODE' > /tmp/aipt-old-migration-deployment-ids.txt
+          const x = require('/tmp/aipt-clean-deployments.json');
+          const matches = (x.result || [])
+            .filter(d => d?.environment === 'preview' && d?.deployment_trigger?.metadata?.branch === process.env.MIGRATION_BRANCH)
+            .sort((a,b) => Date.parse(b.created_on) - Date.parse(a.created_on));
+          for (const d of matches.slice(1)) console.log(d.id);
+          NODE
+                while IFS= read -r deployment_id; do
+                  [ -z "$deployment_id" ] && continue
+                  delete_status=$(curl --silent --show-error --output /tmp/aipt-delete-deployment.json --write-out '%{http_code}' \
+                    --request DELETE \
+                    --header "Authorization: Bearer ${token}" \
+                    --header "Content-Type: application/json" \
+                    "${deployments_url}/${deployment_id}")
+                  if [ "$delete_status" != "200" ]; then
+                    echo "ERROR: could not delete an older migration preview deployment (HTTP $delete_status)"
+                    original_exit=1
+                  fi
+                done < /tmp/aipt-old-migration-deployment-ids.txt
+              fi
+            fi
+
+            cf_get "$project_url" > /tmp/aipt-project-clean.json
+            node <<'NODE'
+          const x = require('/tmp/aipt-project-clean.json');
+          const db = x?.result?.deployment_configs?.preview?.d1_databases?.DB?.id ?? null;
+          const secret = x?.result?.deployment_configs?.preview?.env_vars?.AIPT_MIGRATION_NONCE ?? null;
+          if (db !== null) throw new Error('Preview DB binding remains after cleanup');
+          if (secret !== null) throw new Error('Preview migration secret remains after cleanup');
+          console.log('Verified preview DB binding absent after cleanup');
+          console.log('Verified preview migration secret absent after cleanup');
+          NODE
+            cleanup_verify_status=$?
+            if [ $cleanup_verify_status -ne 0 ]; then original_exit=1; fi
+
+            unset token account_id nonce
+            rm -f /tmp/aipt-*.json /tmp/aipt-*.txt
+            exit "$original_exit"
+          }
+          trap cleanup EXIT
+
+          if ! [[ "$account_id" =~ ^[0-9a-fA-F]{32}$ ]]; then
+            echo "Invalid Cloudflare account ID format"
+            exit 1
+          fi
+
+          # Verify canonical production DB identity and a completely clean
+          # preview environment before adding any production-data capability.
+          cf_get "$project_url" > /tmp/aipt-project-before.json
+          EXPECTED_D1_DATABASE_ID="$EXPECTED_D1_DATABASE_ID" node <<'NODE'
+          const x = require('/tmp/aipt-project-before.json');
+          const productionDb = x?.result?.deployment_configs?.production?.d1_databases?.DB?.id ?? null;
+          const previewDb = x?.result?.deployment_configs?.preview?.d1_databases?.DB?.id ?? null;
+          const previewSecret = x?.result?.deployment_configs?.preview?.env_vars?.AIPT_MIGRATION_NONCE ?? null;
+          if (productionDb !== process.env.EXPECTED_D1_DATABASE_ID) throw new Error('Production DB identity mismatch');
+          if (previewDb !== null) throw new Error('Preview DB binding must be absent before migration');
+          if (previewSecret !== null) throw new Error('Preview migration secret must be absent before migration');
+          console.log('Verified exact production D1 UUID');
+          console.log('Verified preview migration capability initially absent');
+          NODE
+
+          cp scripts/ops/d1-migrate-0002-pages-function.ts functions/__aipt_internal_migrate_0002.ts
+
+          add_payload=$(EXPECTED_D1_DATABASE_ID="$EXPECTED_D1_DATABASE_ID" MIGRATION_NONCE="$nonce" node -e 'process.stdout.write(JSON.stringify({deployment_configs:{preview:{d1_databases:{DB:{id:process.env.EXPECTED_D1_DATABASE_ID}},env_vars:{AIPT_MIGRATION_NONCE:{type:"secret_text",value:process.env.MIGRATION_NONCE}}}}}))')
+          cf_patch "$project_url" "$add_payload" > /tmp/aipt-preview-config-add.json
+          preview_config_modified=1
+          unset add_payload
+
+          # Bindings changed: deploy a dedicated non-canonical preview. Hide
+          # wrangler.toml for this ad-hoc deployment so dashboard preview config
+          # is authoritative and production bindings are not copied wholesale.
+          mv wrangler.toml /tmp/aipt-wrangler.toml
+          deploy_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          set +e
+          deploy_preview > /tmp/aipt-migration-deploy.txt 2>&1
+          deploy_status=$?
+          set -e
+          mv /tmp/aipt-wrangler.toml wrangler.toml
+          if [ $deploy_status -ne 0 ]; then
+            echo "Dedicated preview deployment failed"
+            sed -n '1,120p' /tmp/aipt-migration-deploy.txt | sed -E 's#https://[^ ]+#<preview-url>#g'
+            exit 1
+          fi
+          migration_deployment_seen=1
+          echo "Dedicated migration preview deployed"
+
+          cf_get "${deployments_url}?env=preview&per_page=100" > /tmp/aipt-preview-deployments.json
+          MIGRATION_BRANCH="$MIGRATION_BRANCH" DEPLOY_STARTED="$deploy_started" node <<'NODE' > /tmp/aipt-migration-deployment.txt
+          const x = require('/tmp/aipt-preview-deployments.json');
+          const start = Date.parse(process.env.DEPLOY_STARTED);
+          const matches = (x.result || [])
+            .filter(d => d?.environment === 'preview' && d?.deployment_trigger?.metadata?.branch === process.env.MIGRATION_BRANCH && Date.parse(d.created_on) >= start - 10000)
+            .sort((a,b) => Date.parse(b.created_on) - Date.parse(a.created_on));
+          if (!matches.length) throw new Error('Dedicated migration deployment could not be identified');
+          const d = matches[0];
+          const url = String(d.url || '').replace(/\/$/, '');
+          if (!/^https:\/\/[a-z0-9-]+\.ai-premium-tools\.pages\.dev$/i.test(url)) throw new Error('Unexpected preview deployment URL');
+          process.stdout.write(`${d.id}\n${url}\n`);
+          NODE
+          migration_deployment_id=$(sed -n '1p' /tmp/aipt-migration-deployment.txt)
+          migration_url=$(sed -n '2p' /tmp/aipt-migration-deployment.txt)
+          echo "Identified isolated migration deployment"
+
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${nonce}" \
+            --header "Content-Type: application/json" \
+            --data '{"action":"probe"}' \
+            "${migration_url}/__aipt_internal_migrate_0002" > /tmp/aipt-before.json
+          node <<'NODE'
+          const x = require('/tmp/aipt-before.json');
+          if (!x.ok) throw new Error('D1 probe failed');
+          if (!['pre-0002','migrated-0002'].includes(x.state)) throw new Error(`Unsafe D1 state: ${x.state}`);
+          if ((x.unknownLedger || []).length) throw new Error('Unknown D1 migration ledger entries exist');
+          console.log(`Production D1 state before: ${x.state}`);
+          console.log(`Base row counts before: ${JSON.stringify(x.counts)}`);
+          console.log(`Migration ledger before: ${JSON.stringify(x.ledger)}`);
+          NODE
+
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${nonce}" \
+            --header "Content-Type: application/json" \
+            --data '{"action":"apply"}' \
+            "${migration_url}/__aipt_internal_migrate_0002" > /tmp/aipt-after.json
+          node <<'NODE'
+          const x = require('/tmp/aipt-after.json');
+          if (!x.ok) throw new Error('D1 migration response failed');
+          if (x.after?.state !== 'migrated-0002') throw new Error('D1 did not reach migrated-0002 state');
+          const ledger = x.after?.ledger || [];
+          if (!ledger.includes('0001_baseline.sql') || !ledger.includes('0002_catalog_media_foundation.sql')) throw new Error('Wrangler-compatible ledger is incomplete');
+          if (JSON.stringify(x.before?.counts || {}) !== JSON.stringify(x.after?.counts || {})) throw new Error('Base row counts changed during migration');
+          console.log(`Migration applied in this run: ${Boolean(x.applied)}`);
+          console.log(`Production D1 state after: ${x.after.state}`);
+          console.log(`Base row counts after: ${JSON.stringify(x.after.counts)}`);
+          console.log(`Migration ledger after: ${JSON.stringify(ledger)}`);
+          NODE
+
+          # Remove project-level preview capability immediately. The EXIT trap
+          # will then publish a clean preview and delete older migration builds.
+          cf_patch "$project_url" '{"deployment_configs":{"preview":{"d1_databases":{"DB":null},"env_vars":{"AIPT_MIGRATION_NONCE":null}}}}' \
+            > /tmp/aipt-preview-config-remove.json
+          preview_config_modified=0
+          echo "Removed temporary preview D1 binding and secret"
