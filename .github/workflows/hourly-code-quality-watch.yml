@@ -94,6 +94,34 @@ jobs:
           fi
           echo 'No forbidden environment files are tracked.'
 
+      - name: Aggregate quality gates
+        id: aggregate
+        if: always()
+        continue-on-error: true
+        shell: bash
+        env:
+          INSTALL_RESULT: ${{ steps.install.outcome }}
+          TYPECHECK_RESULT: ${{ steps.typecheck.outcome }}
+          TEST_RESULT: ${{ steps.tests.outcome }}
+          MIGRATION_RESULT: ${{ steps.migrations.outcome }}
+          BUILD_RESULT: ${{ steps.build.outcome }}
+          AUDIT_RESULT: ${{ steps.audit.outcome }}
+          HYGIENE_RESULT: ${{ steps.hygiene.outcome }}
+        run: |
+          set -euo pipefail
+          failed=0
+          for value in \
+            "$INSTALL_RESULT" \
+            "$TYPECHECK_RESULT" \
+            "$TEST_RESULT" \
+            "$MIGRATION_RESULT" \
+            "$BUILD_RESULT" \
+            "$AUDIT_RESULT" \
+            "$HYGIENE_RESULT"; do
+            if [ "$value" != 'success' ]; then failed=1; fi
+          done
+          exit "$failed"
+
       - name: Build quality report
         if: always()
         shell: bash
@@ -114,12 +142,13 @@ jobs:
             echo '| Production build | ${{ steps.build.outcome }} |'
             echo '| High/critical dependency audit | ${{ steps.audit.outcome }} |'
             echo '| Secret-hygiene guard | ${{ steps.hygiene.outcome }} |'
+            echo '| Aggregate | ${{ steps.aggregate.outcome }} |'
             echo
             echo 'This watchdog never deploys. It detects regressions on main between feature deployments.'
           } | tee "$REPORT" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Open or refresh code-quality incident
-        if: always() && github.event_name != 'pull_request' && (steps.install.outcome == 'failure' || steps.typecheck.outcome == 'failure' || steps.tests.outcome == 'failure' || steps.migrations.outcome == 'failure' || steps.build.outcome == 'failure' || steps.audit.outcome == 'failure' || steps.hygiene.outcome == 'failure')
+        if: always() && github.event_name != 'pull_request' && steps.aggregate.outcome == 'failure'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -134,7 +163,7 @@ jobs:
           fi
 
       - name: Close recovered code-quality incident
-        if: always() && github.event_name != 'pull_request' && steps.install.outcome == 'success' && steps.typecheck.outcome == 'success' && steps.tests.outcome == 'success' && steps.migrations.outcome == 'success' && steps.build.outcome == 'success' && steps.audit.outcome == 'success' && steps.hygiene.outcome == 'success'
+        if: always() && github.event_name != 'pull_request' && steps.aggregate.outcome == 'success'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -147,5 +176,5 @@ jobs:
           fi
 
       - name: Fail when a quality gate failed
-        if: always() && (steps.install.outcome == 'failure' || steps.typecheck.outcome == 'failure' || steps.tests.outcome == 'failure' || steps.migrations.outcome == 'failure' || steps.build.outcome == 'failure' || steps.audit.outcome == 'failure' || steps.hygiene.outcome == 'failure')
+        if: always() && steps.aggregate.outcome == 'failure'
         run: exit 1
