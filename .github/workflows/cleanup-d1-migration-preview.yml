@@ -1,0 +1,104 @@
+name: Cleanup AIPT D1 Migration Preview
+
+on:
+  push:
+    branches: [ops/cleanup-d1-migration-preview]
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cleanup dedicated migration preview deployments
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RAW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT_NAME: 'ai-premium-tools'
+          MIGRATION_BRANCH: 'aipt-db-migration-0002'
+        run: |
+          set -euo pipefail
+          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
+          account_id=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_ACCOUNT_ID||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
+          project_url="https://api.cloudflare.com/client/v4/accounts/${account_id}/pages/projects/${PROJECT_NAME}"
+          deployments_url="${project_url}/deployments"
+
+          if ! [[ "$account_id" =~ ^[0-9a-fA-F]{32}$ ]]; then
+            echo "Invalid Cloudflare account ID format"
+            exit 1
+          fi
+
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${token}" \
+            --header "Content-Type: application/json" \
+            "$project_url" > /tmp/aipt-project.json
+          node <<'NODE'
+          const x = require('/tmp/aipt-project.json');
+          const previewDb = x?.result?.deployment_configs?.preview?.d1_databases?.DB?.id ?? null;
+          const previewSecret = x?.result?.deployment_configs?.preview?.env_vars?.AIPT_MIGRATION_NONCE ?? null;
+          if (previewDb !== null) throw new Error('Refusing cleanup: preview DB binding is currently present');
+          if (previewSecret !== null) throw new Error('Refusing cleanup: preview migration secret is currently present');
+          console.log('Verified project preview DB binding absent');
+          console.log('Verified project preview migration secret absent');
+          NODE
+
+          # Use the canonical list endpoint with no query parameters. The
+          # migration deployments are the freshest previews, so they are on the
+          # first response page. Only the dedicated migration branch is touched.
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${token}" \
+            --header "Content-Type: application/json" \
+            "$deployments_url" > /tmp/aipt-deployments.json
+
+          MIGRATION_BRANCH="$MIGRATION_BRANCH" node <<'NODE' > /tmp/aipt-migration-deployments.json
+          const fs = require('fs');
+          const x = require('/tmp/aipt-deployments.json');
+          if (!x?.success || !Array.isArray(x.result)) throw new Error('Cloudflare deployment listing was not successful');
+          const matches = x.result
+            .filter(d => d?.environment === 'preview' && d?.deployment_trigger?.metadata?.branch === process.env.MIGRATION_BRANCH)
+            .sort((a,b) => Date.parse(b.created_on) - Date.parse(a.created_on));
+          if (matches.length === 0) throw new Error('No dedicated migration preview deployments found; refusing blind cleanup');
+          const safe = matches.map(d => ({ id: d.id, created_on: d.created_on, uses_functions: Boolean(d.uses_functions), aliases: d.aliases || [] }));
+          fs.writeFileSync('/tmp/aipt-migration-deployments.json', JSON.stringify(safe));
+          console.error(`Found ${matches.length} dedicated migration preview deployment(s)`);
+          console.error(`Newest dedicated deployment uses Functions: ${Boolean(matches[0].uses_functions)}`);
+          NODE
+
+          # Keep the newest deployment because Cloudflare does not allow the
+          # latest deployment for a branch to be deleted. Delete every older
+          # deployment from this one dedicated branch; unrelated previews are
+          # never selected.
+          node <<'NODE' > /tmp/aipt-delete-ids.txt
+          const rows = require('/tmp/aipt-migration-deployments.json');
+          for (const d of rows.slice(1)) console.log(d.id);
+          NODE
+
+          delete_count=0
+          while IFS= read -r deployment_id; do
+            [ -z "$deployment_id" ] && continue
+            status=$(curl --silent --show-error --output /tmp/aipt-delete-response.json --write-out '%{http_code}' \
+              --request DELETE \
+              --header "Authorization: Bearer ${token}" \
+              --header "Content-Type: application/json" \
+              "${deployments_url}/${deployment_id}?force=true")
+            if [ "$status" != "200" ]; then
+              echo "Failed to delete an older dedicated migration deployment (HTTP $status)"
+              cat /tmp/aipt-delete-response.json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const x=JSON.parse(s);for(const e of x.errors||[])console.error(`Cloudflare error ${e.code}: ${e.message}`)}catch{}})'
+              exit 1
+            fi
+            delete_count=$((delete_count + 1))
+          done < /tmp/aipt-delete-ids.txt
+          echo "Deleted ${delete_count} older dedicated migration preview deployment(s)"
+
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${token}" \
+            --header "Content-Type: application/json" \
+            "$deployments_url" > /tmp/aipt-deployments-after.json
+          MIGRATION_BRANCH="$MIGRATION_BRANCH" node <<'NODE'
+          const x = require('/tmp/aipt-deployments-after.json');
+          const matches = (x.result || []).filter(d => d?.environment === 'preview' && d?.deployment_trigger?.metadata?.branch === process.env.MIGRATION_BRANCH);
+          if (matches.length !== 1) throw new Error(`Expected exactly one clean latest migration-branch deployment after cleanup; found ${matches.length}`);
+          console.log('Verified exactly one latest dedicated migration preview remains');
+          NODE
+
+          unset token account_id
+          rm -f /tmp/aipt-*.json /tmp/aipt-*.txt
