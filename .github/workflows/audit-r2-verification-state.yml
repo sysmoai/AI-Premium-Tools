@@ -1,0 +1,68 @@
+name: Audit AIPT R2 Verification State
+
+on:
+  push:
+    branches: [ops/audit-r2-verification-state]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Audit sanitized Pages preview state
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RAW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT_NAME: ai-premium-tools
+          TEST_BRANCH: aipt-r2-media-ci-verify
+          EXPECTED_D1_DATABASE_ID: 9c19dfdb-aead-4bed-b6ff-f6bf379bc296
+          EXPECTED_R2_BUCKET: aipt-media
+        run: |
+          set -euo pipefail
+          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim();if(!v)process.exit(1);process.stdout.write(v)')
+          account_id=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_ACCOUNT_ID||"").trim();if(!v)process.exit(1);process.stdout.write(v)')
+          project_url="https://api.cloudflare.com/client/v4/accounts/${account_id}/pages/projects/${PROJECT_NAME}"
+          deployments_url="${project_url}/deployments"
+          curl --fail --silent --show-error --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' "$project_url" > /tmp/project.json
+          curl --fail --silent --show-error --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' "$deployments_url" > /tmp/deployments.json
+          EXPECTED_D1_DATABASE_ID="$EXPECTED_D1_DATABASE_ID" EXPECTED_R2_BUCKET="$EXPECTED_R2_BUCKET" TEST_BRANCH="$TEST_BRANCH" node <<'NODE' > r2-verification-state.json
+          const fs=require('fs');
+          const project=require('/tmp/project.json');
+          const deployments=require('/tmp/deployments.json');
+          const prod=project?.result?.deployment_configs?.production||{};
+          const prev=project?.result?.deployment_configs?.preview||{};
+          const matches=(deployments?.result||[])
+            .filter(d=>d?.environment==='preview'&&d?.deployment_trigger?.metadata?.branch===process.env.TEST_BRANCH)
+            .sort((a,b)=>Date.parse(b.created_on)-Date.parse(a.created_on));
+          const out={
+            project_ok: project?.success===true,
+            production_d1_matches: (prod.d1_databases?.DB?.id??null)===process.env.EXPECTED_D1_DATABASE_ID,
+            production_r2_matches: (prod.r2_buckets?.MEDIA?.name??null)===process.env.EXPECTED_R2_BUCKET,
+            preview:{
+              db_present:Boolean(prev.d1_databases?.DB?.id),
+              r2_present:Boolean(prev.r2_buckets?.MEDIA?.name),
+              session_secret_present:Boolean(prev.env_vars?.SESSION_SECRET),
+              test_nonce_present:Boolean(prev.env_vars?.AIPT_MEDIA_TEST_NONCE),
+            },
+            dedicated_deployments: matches.map(d=>({
+              id:d.id,
+              created_on:d.created_on,
+              uses_functions:Boolean(d.uses_functions),
+              db_present:Boolean(d.d1_databases?.DB?.id),
+              r2_present:Boolean(d.r2_buckets?.MEDIA?.name),
+              session_secret_present:Boolean(d.env_vars?.SESSION_SECRET),
+              test_nonce_present:Boolean(d.env_vars?.AIPT_MEDIA_TEST_NONCE),
+            })),
+          };
+          fs.writeFileSync('r2-verification-state.json',JSON.stringify(out,null,2));
+          console.log(JSON.stringify(out));
+          NODE
+          unset token account_id
+
+      - name: Upload sanitized audit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: r2-verification-state
+          path: r2-verification-state.json
+          if-no-files-found: error
+          retention-days: 1
