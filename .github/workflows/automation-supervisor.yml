@@ -4,6 +4,14 @@ on:
   schedule:
     - cron: '2,17,32,47 * * * *'
   workflow_dispatch:
+  workflow_run:
+    workflows:
+      - 'Validate and Deploy AIPT'
+      - 'Continuous AIPT Production Monitor'
+      - 'AIPT Commerce and Data Integrity Watch'
+      - 'AIPT Hourly Code and Security Quality Watch'
+      - 'Deep AIPT SEO and Content Audit'
+    types: [completed]
   pull_request:
     paths:
       - '.github/workflows/automation-supervisor.yml'
@@ -39,7 +47,7 @@ jobs:
           cat > "$REPORT" <<'EOF'
           # AIPT automation supervisor
 
-          This control-plane job checks whether independent AIPT watchdogs are actually running. If a scheduled watchdog becomes stale, the supervisor dispatches it manually instead of waiting for the next cron window.
+          This control-plane job checks whether independent AIPT watchdogs are actually running. It wakes both on its own staggered cron and whenever another key AIPT workflow completes. If a watchdog becomes stale, the supervisor dispatches it manually instead of waiting for the next cron window.
 
           EOF
 
@@ -74,8 +82,8 @@ jobs:
 
           check_workflow 'continuous-production-monitor.yml' 'Production monitor' 40
           check_workflow 'commerce-data-integrity-watch.yml' 'Commerce/data integrity watchdog' 40
-          check_workflow 'hourly-code-quality-watch.yml' 'Code/security quality watchdog' 100
-          check_workflow 'deep-seo-content-audit.yml' 'Deep SEO/content audit' 240
+          check_workflow 'hourly-code-quality-watch.yml' 'Code/security quality watchdog' 120
+          check_workflow 'deep-seo-content-audit.yml' 'Deep SEO/content audit' 420
 
           echo >> "$REPORT"
           if [ "$FAILURES" -eq 0 ]; then
