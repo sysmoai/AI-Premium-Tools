@@ -1,0 +1,58 @@
+name: Probe Cloudflare Token Capabilities
+
+on:
+  push:
+    branches: [probe/cloudflare-token-capabilities]
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe current Cloudflare credential safely
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_DATABASE_ID: '9c19dfdb-aead-4bed-b6ff-f6bf379bc296'
+        run: |
+          set -euo pipefail
+          normalized_token=$(node -e 'const clean=(process.env.CLOUDFLARE_API_TOKEN||"").trim(); if(!clean){process.exit(1)}; process.stdout.write(clean)')
+          if ! [[ "${CLOUDFLARE_ACCOUNT_ID}" =~ ^[0-9a-fA-F]{32}$ ]]; then
+            echo "Account ID format: INVALID"
+            exit 1
+          fi
+          echo "Account ID format: valid"
+
+          probe() {
+            label="$1"
+            url="$2"
+            output="/tmp/probe-$RANDOM.json"
+            status=$(curl --silent --show-error --output "$output" --write-out '%{http_code}' \
+              --header "Authorization: Bearer ${normalized_token}" \
+              --header "Content-Type: application/json" \
+              "$url" || true)
+            LABEL="$label" STATUS="$status" OUTPUT="$output" node <<'NODE'
+          const fs = require('fs');
+          const label = process.env.LABEL;
+          const status = process.env.STATUS;
+          let body = null;
+          try { body = JSON.parse(fs.readFileSync(process.env.OUTPUT, 'utf8')); } catch {}
+          const success = body?.success === true;
+          const errors = Array.isArray(body?.errors) ? body.errors : [];
+          const details = errors.slice(0, 3).map(e => `${String(e.code ?? 'unknown')}:${String(e.message ?? 'unknown')}`).join(' | ');
+          console.log(`${label}: HTTP ${status}; success=${success}${details ? `; errors=${details}` : ''}`);
+          NODE
+            rm -f "$output"
+          }
+
+          probe "Token verify (user)" "https://api.cloudflare.com/client/v4/user/tokens/verify"
+          probe "Token verify (account)" "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/tokens/verify"
+          probe "Pages project read" "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/ai-premium-tools"
+          probe "D1 database read" "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/d1/database/${D1_DATABASE_ID}"
+          probe "R2 bucket list" "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/r2/buckets"
+          probe "Workers scripts list" "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts"
+          probe "User token permission groups" "https://api.cloudflare.com/client/v4/user/tokens/permission_groups?name=D1%20Edit"
+          probe "Account token permission groups" "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/tokens/permission_groups?name=D1%20Edit"
+          probe "Account IAM permission groups" "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/iam/permission_groups"
+
+          unset normalized_token
