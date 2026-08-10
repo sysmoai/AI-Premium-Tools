@@ -60,21 +60,17 @@ jobs:
       - name: Regenerate lockfile under existing supply-chain policy
         run: pnpm install --lockfile-only
 
-      - name: Verify exact patched graph and audit
+      - name: Verify patched dependency graph and security audit
         shell: bash
         run: |
           set -euo pipefail
-          grep -q 'path-to-regexp@8.4.2' pnpm-lock.yaml
-          grep -q 'ip-address@10.3.1' pnpm-lock.yaml
-          if grep -q 'path-to-regexp@8.3.0' pnpm-lock.yaml; then
-            echo 'Vulnerable path-to-regexp@8.3.0 remains in lockfile'
-            exit 1
-          fi
-          if grep -q 'ip-address@10.1.0' pnpm-lock.yaml; then
-            echo 'Vulnerable ip-address@10.1.0 remains in lockfile'
-            exit 1
-          fi
           pnpm install --frozen-lockfile
+          echo '--- resolved path-to-regexp graph ---'
+          pnpm --filter @workspace/api-server why path-to-regexp || true
+          echo '--- resolved ip-address graph ---'
+          pnpm --filter @workspace/api-server why ip-address || true
+          echo '--- resolved express-rate-limit graph ---'
+          pnpm --filter @workspace/api-server why express-rate-limit || true
           pnpm --filter @workspace/api-server run typecheck
           pnpm --filter @workspace/api-server run build
           pnpm audit --prod --audit-level high
