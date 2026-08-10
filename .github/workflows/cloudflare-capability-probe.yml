@@ -55,4 +55,19 @@ jobs:
           probe "Account token permission groups" "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/tokens/permission_groups?name=D1%20Edit"
           probe "Account IAM permission groups" "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/iam/permission_groups"
 
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${normalized_token}" \
+            --header "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/ai-premium-tools" \
+            > /tmp/aipt-pages-project.json
+          D1_DATABASE_ID="$D1_DATABASE_ID" node <<'NODE'
+          const fs = require('fs');
+          const x = JSON.parse(fs.readFileSync('/tmp/aipt-pages-project.json', 'utf8'));
+          const production = x?.result?.deployment_configs?.production?.d1_databases?.DB?.id ?? null;
+          const preview = x?.result?.deployment_configs?.preview?.d1_databases?.DB?.id ?? null;
+          console.log(`Production Pages DB matches expected: ${production === process.env.D1_DATABASE_ID}`);
+          console.log(`Preview Pages DB matches production: ${Boolean(preview && production && preview === production)}`);
+          console.log(`Preview Pages DB binding present: ${Boolean(preview)}`);
+          NODE
+          rm -f /tmp/aipt-pages-project.json
           unset normalized_token
