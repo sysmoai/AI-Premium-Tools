@@ -1,0 +1,257 @@
+name: Verify AIPT R2 Media Live v2
+
+on:
+  push:
+    branches: [ops/verify-r2-media-live-v2]
+
+jobs:
+  verify-media:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: aipt-r2-live-verification
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies and video fixture tool
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ffmpeg
+          fi
+          ffmpeg -version | head -n 1
+
+      - name: Validate and build
+        shell: bash
+        env:
+          PORT: '8080'
+          BASE_PATH: '/'
+          VITE_SITE_URL: 'https://aipremium.tools'
+        run: |
+          set -euo pipefail
+          pnpm run typecheck
+          pnpm --filter @workspace/aipt-store run test
+          pnpm --filter @workspace/aipt-store run build
+          printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > /tmp/aipt-ci-disposable-image.png
+          ffmpeg -loglevel error -f lavfi -i color=c=black:s=16x16:d=0.3 -an -c:v libx264 -pix_fmt yuv420p -movflags +faststart -y /tmp/aipt-ci-disposable-video.mp4
+          test -s /tmp/aipt-ci-disposable-image.png
+          test -s /tmp/aipt-ci-disposable-video.mp4
+
+      - name: Exercise production R2 through isolated preview and clean up
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RAW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EXPECTED_D1_DATABASE_ID: '9c19dfdb-aead-4bed-b6ff-f6bf379bc296'
+          EXPECTED_R2_BUCKET: 'aipt-media'
+          PROJECT_NAME: 'ai-premium-tools'
+          TEST_BRANCH: 'aipt-r2-media-ci-verify'
+        run: |
+          set -euo pipefail
+
+          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim();if(!v)process.exit(1);process.stdout.write(v)')
+          account_id=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_ACCOUNT_ID||"").trim();if(!v)process.exit(1);process.stdout.write(v)')
+          session_secret=$(node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("hex"))')
+          cleanup_nonce=$(node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("hex"))')
+          admin_token=$(SESSION_SECRET="$session_secret" node -e 'const c=require("crypto");process.stdout.write(c.createHmac("sha256",process.env.SESSION_SECRET).update("aipt:admin:v1").digest("hex"))')
+          echo "::add-mask::$session_secret"
+          echo "::add-mask::$cleanup_nonce"
+          echo "::add-mask::$admin_token"
+
+          project_url="https://api.cloudflare.com/client/v4/accounts/${account_id}/pages/projects/${PROJECT_NAME}"
+          deployments_url="${project_url}/deployments"
+          preview_modified=0
+          test_deployed=0
+          test_deployment_id=""
+          test_url=""
+          image_id=""; image_key=""; image_path=""
+          video_id=""; video_key=""; video_path=""
+          assets_cleaned=0
+
+          cf_get() {
+            curl --fail --silent --show-error --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' "$1"
+          }
+          cf_patch() {
+            curl --fail --silent --show-error --request PATCH --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' --data "$2" "$1"
+          }
+          deploy_preview() {
+            CLOUDFLARE_API_TOKEN="$token" CLOUDFLARE_ACCOUNT_ID="$account_id" pnpm exec wrangler pages deploy artifacts/aipt-store/dist/public --project-name="$PROJECT_NAME" --branch="$TEST_BRANCH"
+          }
+          cleanup_body() {
+            IMAGE_ID="$image_id" IMAGE_KEY="$image_key" VIDEO_ID="$video_id" VIDEO_KEY="$video_key" node -e 'const items=[];if(process.env.IMAGE_ID&&process.env.IMAGE_KEY)items.push({id:Number(process.env.IMAGE_ID),key:process.env.IMAGE_KEY});if(process.env.VIDEO_ID&&process.env.VIDEO_KEY)items.push({id:Number(process.env.VIDEO_ID),key:process.env.VIDEO_KEY});process.stdout.write(JSON.stringify({items}))'
+          }
+
+          cleanup() {
+            result=$?
+            set +e
+            echo "Starting guaranteed media verification cleanup"
+
+            if [ "$assets_cleaned" = "0" ] && [ -n "$test_url" ] && { [ -n "$image_id" ] || [ -n "$video_id" ]; }; then
+              body=$(cleanup_body)
+              code=$(curl --silent --show-error --output /tmp/aipt-cleanup-assets.json --write-out '%{http_code}' --request POST --header "Authorization: Bearer ${cleanup_nonce}" --header 'Content-Type: application/json' --data "$body" "${test_url}/__aipt_internal_cleanup_media")
+              if [ "$code" = "200" ]; then
+                assets_cleaned=1
+                echo "Disposable R2/D1 assets cleaned"
+              else
+                echo "ERROR: disposable asset cleanup failed with HTTP $code"
+                result=1
+              fi
+            fi
+
+            if [ "$preview_modified" = "1" ]; then
+              cf_patch "$project_url" '{"deployment_configs":{"preview":{"d1_databases":{"DB":null},"r2_buckets":{"MEDIA":null},"env_vars":{"SESSION_SECRET":null,"AIPT_MEDIA_TEST_NONCE":null}}}}' > /tmp/aipt-cleanup-preview.json
+              if [ $? -eq 0 ]; then
+                preview_modified=0
+                echo "Removed temporary preview D1/R2/secrets"
+              else
+                echo "ERROR: failed to remove temporary preview capabilities"
+                result=1
+              fi
+            fi
+
+            rm -f functions/__aipt_internal_cleanup_media.ts
+
+            if [ "$test_deployed" = "1" ]; then
+              mv wrangler.toml /tmp/aipt-wrangler.toml 2>/dev/null || true
+              deploy_preview > /tmp/aipt-clean-preview.txt 2>&1
+              clean_code=$?
+              mv /tmp/aipt-wrangler.toml wrangler.toml 2>/dev/null || true
+              if [ $clean_code -ne 0 ]; then
+                echo "ERROR: clean preview redeploy failed"
+                result=1
+              else
+                echo "Clean preview redeployed without temporary cleanup endpoint/bindings"
+                cf_get "$deployments_url" > /tmp/aipt-deployments-clean.json
+                TEST_BRANCH="$TEST_BRANCH" node -e 'const x=require("/tmp/aipt-deployments-clean.json");const m=(x.result||[]).filter(d=>d.environment==="preview"&&d.deployment_trigger?.metadata?.branch===process.env.TEST_BRANCH).sort((a,b)=>Date.parse(b.created_on)-Date.parse(a.created_on));if(!m.length)throw new Error("No verification deployment found during cleanup");for(const d of m.slice(1))console.log(d.id)' > /tmp/aipt-old-deployments.txt
+                while IFS= read -r id; do
+                  [ -z "$id" ] && continue
+                  code=$(curl --silent --show-error --output /tmp/aipt-delete-deployment.json --write-out '%{http_code}' --request DELETE --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' "${deployments_url}/${id}?force=true")
+                  if [ "$code" != "200" ] && [ "$code" != "204" ]; then
+                    echo "ERROR: failed deleting old verification deployment: HTTP $code"
+                    result=1
+                  fi
+                done < /tmp/aipt-old-deployments.txt
+              fi
+            fi
+
+            cf_get "$project_url" > /tmp/aipt-project-clean.json
+            node -e 'const x=require("/tmp/aipt-project-clean.json");const p=x.result?.deployment_configs?.preview||{};if((p.d1_databases?.DB?.id??null)!==null)throw new Error("Preview DB remains");if((p.r2_buckets?.MEDIA?.name??null)!==null)throw new Error("Preview R2 remains");if((p.env_vars?.SESSION_SECRET??null)!==null)throw new Error("Preview SESSION_SECRET remains");if((p.env_vars?.AIPT_MEDIA_TEST_NONCE??null)!==null)throw new Error("Preview nonce remains");console.log("Verified all temporary preview capabilities removed")'
+            if [ $? -ne 0 ]; then result=1; fi
+
+            if [ -n "$test_deployment_id" ]; then
+              code=$(curl --silent --show-error --output /tmp/aipt-test-deleted.json --write-out '%{http_code}' --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' "${deployments_url}/${test_deployment_id}")
+              if [ "$code" = "404" ]; then
+                echo "Verified media-capable preview deployment deleted"
+              else
+                echo "ERROR: media-capable preview deployment still exists: HTTP $code"
+                result=1
+              fi
+            fi
+
+            unset token account_id session_secret cleanup_nonce admin_token
+            exit "$result"
+          }
+          trap cleanup EXIT
+
+          if ! [[ "$account_id" =~ ^[0-9a-fA-F]{32}$ ]]; then echo "Invalid account ID format"; exit 1; fi
+
+          cf_get "$project_url" > /tmp/aipt-project-before.json
+          EXPECTED_D1_DATABASE_ID="$EXPECTED_D1_DATABASE_ID" EXPECTED_R2_BUCKET="$EXPECTED_R2_BUCKET" node -e 'const x=require("/tmp/aipt-project-before.json");const prod=x.result?.deployment_configs?.production||{};const prev=x.result?.deployment_configs?.preview||{};if(prod.d1_databases?.DB?.id!==process.env.EXPECTED_D1_DATABASE_ID)throw new Error("Production D1 identity mismatch");if(prod.r2_buckets?.MEDIA?.name!==process.env.EXPECTED_R2_BUCKET)throw new Error(`Production R2 identity mismatch: ${prod.r2_buckets?.MEDIA?.name}`);if((prev.d1_databases?.DB?.id??null)!==null||(prev.r2_buckets?.MEDIA?.name??null)!==null||(prev.env_vars?.SESSION_SECRET??null)!==null||(prev.env_vars?.AIPT_MEDIA_TEST_NONCE??null)!==null)throw new Error("Preview media capabilities are not clean at start");console.log(`Verified production R2 binding MEDIA -> ${process.env.EXPECTED_R2_BUCKET}`);console.log("Verified preview capabilities initially absent")'
+
+          cp scripts/ops/media-test-cleanup-pages-function.ts functions/__aipt_internal_cleanup_media.ts
+          payload=$(EXPECTED_D1_DATABASE_ID="$EXPECTED_D1_DATABASE_ID" EXPECTED_R2_BUCKET="$EXPECTED_R2_BUCKET" SESSION_SECRET="$session_secret" TEST_NONCE="$cleanup_nonce" node -e 'process.stdout.write(JSON.stringify({deployment_configs:{preview:{d1_databases:{DB:{id:process.env.EXPECTED_D1_DATABASE_ID}},r2_buckets:{MEDIA:{name:process.env.EXPECTED_R2_BUCKET}},env_vars:{SESSION_SECRET:{type:"secret_text",value:process.env.SESSION_SECRET},AIPT_MEDIA_TEST_NONCE:{type:"secret_text",value:process.env.TEST_NONCE}}}}}))')
+          cf_patch "$project_url" "$payload" > /tmp/aipt-preview-add.json
+          preview_modified=1
+          unset payload
+
+          mv wrangler.toml /tmp/aipt-wrangler.toml
+          started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          set +e
+          deploy_preview > /tmp/aipt-test-deploy.txt 2>&1
+          deploy_code=$?
+          set -e
+          mv /tmp/aipt-wrangler.toml wrangler.toml
+          if [ $deploy_code -ne 0 ]; then sed -n '1,100p' /tmp/aipt-test-deploy.txt | sed -E 's#https://[^ ]+#<preview-url>#g'; exit 1; fi
+          test_deployed=1
+
+          cf_get "$deployments_url" > /tmp/aipt-deployments.json
+          TEST_BRANCH="$TEST_BRANCH" STARTED="$started" node -e 'const x=require("/tmp/aipt-deployments.json");const s=Date.parse(process.env.STARTED);const m=(x.result||[]).filter(d=>d.environment==="preview"&&d.deployment_trigger?.metadata?.branch===process.env.TEST_BRANCH&&Date.parse(d.created_on)>=s-10000).sort((a,b)=>Date.parse(b.created_on)-Date.parse(a.created_on));if(!m.length)throw new Error("Could not identify verification deployment");const d=m[0];const u=String(d.url||"").replace(/\/$/,"");if(!/^https:\/\/[a-z0-9-]+\.ai-premium-tools\.pages\.dev$/i.test(u))throw new Error("Unexpected preview URL");process.stdout.write(`${d.id}\n${u}\n`)' > /tmp/aipt-deployment-values.txt
+          test_deployment_id=$(sed -n '1p' /tmp/aipt-deployment-values.txt)
+          test_url=$(sed -n '2p' /tmp/aipt-deployment-values.txt)
+          echo "Isolated media verification preview ready"
+
+          code=$(curl --silent --show-error --output /tmp/aipt-unauth.json --write-out '%{http_code}' --request POST "${test_url}/api/media/upload")
+          [ "$code" = "401" ] || { echo "Expected unauthenticated upload 401, got $code"; exit 1; }
+          echo "Verified media upload auth gate"
+
+          code=$(curl --silent --show-error --output /tmp/aipt-invalid.json --write-out '%{http_code}' --header "Authorization: Bearer ${admin_token}" --form 'file=@/etc/hostname;type=text/plain;filename=aipt-ci-disposable-invalid.txt' --form 'alt_text=AIPT disposable media verification' "${test_url}/api/media/upload")
+          [ "$code" = "415" ] || { echo "Expected unsupported media 415, got $code"; exit 1; }
+          echo "Verified MIME allowlist"
+
+          curl --fail --silent --show-error --header "Authorization: Bearer ${admin_token}" --form 'file=@/tmp/aipt-ci-disposable-image.png;type=image/png;filename=aipt-ci-disposable-image.png' --form 'alt_text=AIPT disposable media verification' --form 'caption=Automated disposable image verification' "${test_url}/api/media/upload" > /tmp/aipt-image-upload.json
+          node -e 'const x=require("/tmp/aipt-image-upload.json");if(!Number.isInteger(Number(x.id))||x.asset_type!=="image"||x.mime_type!=="image/png")throw new Error("Bad image upload response");console.log(x.id);console.log(x.key);console.log(x.url)' > /tmp/aipt-image-values.txt
+          image_id=$(sed -n '1p' /tmp/aipt-image-values.txt); image_key=$(sed -n '2p' /tmp/aipt-image-values.txt); image_path=$(sed -n '3p' /tmp/aipt-image-values.txt)
+          echo "Verified image R2 upload + D1 metadata"
+
+          curl --fail --silent --show-error --header "Authorization: Bearer ${admin_token}" --form 'file=@/tmp/aipt-ci-disposable-video.mp4;type=video/mp4;filename=aipt-ci-disposable-video.mp4' --form 'alt_text=AIPT disposable media verification' --form 'caption=Automated disposable video verification' "${test_url}/api/media/upload" > /tmp/aipt-video-upload.json
+          node -e 'const x=require("/tmp/aipt-video-upload.json");if(!Number.isInteger(Number(x.id))||x.asset_type!=="video"||x.mime_type!=="video/mp4")throw new Error("Bad video upload response");console.log(x.id);console.log(x.key);console.log(x.url)' > /tmp/aipt-video-values.txt
+          video_id=$(sed -n '1p' /tmp/aipt-video-values.txt); video_key=$(sed -n '2p' /tmp/aipt-video-values.txt); video_path=$(sed -n '3p' /tmp/aipt-video-values.txt)
+          echo "Verified video R2 upload + D1 metadata"
+
+          curl --fail --silent --show-error --header "Authorization: Bearer ${admin_token}" "${test_url}/api/media?search=aipt-ci-disposable-&limit=20" > /tmp/aipt-list.json
+          IMAGE_ID="$image_id" VIDEO_ID="$video_id" node -e 'const x=require("/tmp/aipt-list.json");const ids=new Set((x.items||[]).map(i=>Number(i.id)));if(!ids.has(Number(process.env.IMAGE_ID))||!ids.has(Number(process.env.VIDEO_ID)))throw new Error("Disposable media absent from library");console.log("Verified authenticated media listing")'
+
+          curl --fail --silent --show-error -D /tmp/aipt-image-headers.txt -o /tmp/aipt-image-download.png "${test_url}${image_path}"
+          cmp /tmp/aipt-ci-disposable-image.png /tmp/aipt-image-download.png
+          grep -qi '^content-type: image/png' /tmp/aipt-image-headers.txt
+          grep -qi '^etag:' /tmp/aipt-image-headers.txt
+          grep -qi '^accept-ranges: bytes' /tmp/aipt-image-headers.txt
+          echo "Verified exact image serving + metadata"
+
+          curl --fail --silent --show-error -D /tmp/aipt-video-headers.txt -o /tmp/aipt-video-download.mp4 "${test_url}${video_path}"
+          cmp /tmp/aipt-ci-disposable-video.mp4 /tmp/aipt-video-download.mp4
+          grep -qi '^content-type: video/mp4' /tmp/aipt-video-headers.txt
+          grep -qi '^etag:' /tmp/aipt-video-headers.txt
+          grep -qi '^accept-ranges: bytes' /tmp/aipt-video-headers.txt
+          echo "Verified exact video serving + metadata"
+
+          code=$(curl --silent --show-error -D /tmp/aipt-range-headers.txt -o /tmp/aipt-range.bin --write-out '%{http_code}' --header 'Range: bytes=0-15' "${test_url}${video_path}")
+          [ "$code" = "206" ] || { echo "Expected range 206, got $code"; exit 1; }
+          head -c 16 /tmp/aipt-ci-disposable-video.mp4 > /tmp/aipt-range-expected.bin
+          cmp /tmp/aipt-range-expected.bin /tmp/aipt-range.bin
+          grep -qi '^content-range: bytes 0-15/' /tmp/aipt-range-headers.txt
+          grep -qi '^accept-ranges: bytes' /tmp/aipt-range-headers.txt
+          echo "Verified exact video byte-range 206 delivery"
+
+          code=$(curl --silent --show-error -D /tmp/aipt-invalid-range-headers.txt -o /tmp/aipt-invalid-range.bin --write-out '%{http_code}' --header 'Range: bytes=999999999-' "${test_url}${video_path}")
+          [ "$code" = "416" ] || { echo "Expected invalid range 416, got $code"; exit 1; }
+          grep -qi '^content-range: bytes \*/' /tmp/aipt-invalid-range-headers.txt
+          echo "Verified invalid ranges return 416"
+
+          body=$(cleanup_body)
+          curl --fail --silent --show-error --request POST --header "Authorization: Bearer ${cleanup_nonce}" --header 'Content-Type: application/json' --data "$body" "${test_url}/__aipt_internal_cleanup_media" > /tmp/aipt-cleanup-assets.json
+          node -e 'const x=require("/tmp/aipt-cleanup-assets.json");if(!x.ok||x.deleted?.length!==2)throw new Error("Disposable cleanup verification failed");console.log("Verified disposable R2/D1 cleanup")'
+          assets_cleaned=1
+
+          code1=$(curl --silent --show-error --output /tmp/aipt-after-image.txt --write-out '%{http_code}' "${test_url}${image_path}")
+          code2=$(curl --silent --show-error --output /tmp/aipt-after-video.txt --write-out '%{http_code}' "${test_url}${video_path}")
+          [ "$code1" = "404" ] && [ "$code2" = "404" ] || { echo "Cleaned media URLs did not both return 404: image=$code1 video=$code2"; exit 1; }
+          echo "Verified cleaned R2 objects no longer serve"
+
+          curl --fail --silent --show-error --header "Authorization: Bearer ${admin_token}" "${test_url}/api/media?search=aipt-ci-disposable-&limit=20" > /tmp/aipt-list-after.json
+          IMAGE_ID="$image_id" VIDEO_ID="$video_id" node -e 'const x=require("/tmp/aipt-list-after.json");const ids=new Set((x.items||[]).map(i=>Number(i.id)));if(ids.has(Number(process.env.IMAGE_ID))||ids.has(Number(process.env.VIDEO_ID)))throw new Error("Disposable D1 rows remain");console.log("Verified disposable media metadata removed")'
+
+          echo "R2 MEDIA END-TO-END VERIFIED"
