@@ -3,6 +3,11 @@ name: Deploy to Cloudflare Pages
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: aipt-production
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
@@ -32,6 +37,9 @@ jobs:
       - name: Test storefront
         run: pnpm --filter @workspace/aipt-store run test
 
+      - name: Validate D1 migrations locally
+        run: pnpm exec wrangler d1 migrations apply aipt-db --local
+
       - name: Build storefront
         run: pnpm --filter @workspace/aipt-store run build
         env:
@@ -45,3 +53,12 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy artifacts/aipt-store/dist/public --project-name=ai-premium-tools
+
+      - name: Verify canonical production
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 https://aipremium.tools/ > /dev/null
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 https://aipremium.tools/api/healthz | grep -q '"status":"ok"'
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 https://aipremium.tools/api/products > /tmp/aipt-products.json
+          node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("/tmp/aipt-products.json","utf8")); if(!Array.isArray(x) || x.length===0) process.exit(1); console.log(`Verified ${x.length} products from production API`);'
