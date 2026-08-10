@@ -1,0 +1,181 @@
+name: AIPT Commerce and Data Integrity Watch
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+  workflow_run:
+    workflows: ['Validate and Deploy AIPT']
+    types: [completed]
+  pull_request:
+    paths:
+      - '.github/workflows/commerce-data-integrity-watch.yml'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: aipt-commerce-data-integrity-watch
+  cancel-in-progress: true
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Verify catalog, D1-facing APIs and commerce guards
+        id: verify
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/aipt-commerce-watch.mjs <<'NODE'
+          import fs from 'node:fs';
+
+          const BASE = 'https://aipremium.tools';
+          const checks = [];
+          const failures = [];
+          const ok = (msg) => checks.push(`- ✅ ${msg}`);
+          const fail = (msg) => { checks.push(`- ❌ ${msg}`); failures.push(msg); };
+
+          async function request(path, init = {}) {
+            try {
+              return await fetch(`${BASE}${path}`, {
+                redirect: 'manual',
+                signal: AbortSignal.timeout(15000),
+                headers: { 'user-agent': 'AIPT-Commerce-Watch/1.0', ...(init.headers || {}) },
+                ...init,
+              });
+            } catch (error) {
+              throw new Error(`${path}: ${error instanceof Error ? error.message : String(error)}`);
+            }
+          }
+
+          async function json(path, init = {}) {
+            const response = await request(path, init);
+            let body = null;
+            try { body = await response.json(); } catch {}
+            return { response, body };
+          }
+
+          const health = await json('/api/healthz');
+          if (health.response.status === 200 && health.body?.status === 'ok') ok('Health API is healthy');
+          else fail(`Health API failed: HTTP ${health.response.status}`);
+
+          const productsResult = await json('/api/products');
+          const products = productsResult.body;
+          if (productsResult.response.status !== 200 || !Array.isArray(products)) {
+            fail(`Products API is invalid: HTTP ${productsResult.response.status}`);
+          } else {
+            const ids = products.map((p) => Number(p?.id)).filter(Number.isInteger);
+            const uniqueIds = new Set(ids);
+            const invalidPrices = products.filter((p) => !Number.isFinite(Number(p?.price_bdt)) || Number(p.price_bdt) <= 0);
+            const active = products.filter((p) => p?.is_active !== false && Number(p?.is_active ?? 1) !== 0);
+            if (products.length >= 50) ok(`Catalog returned ${products.length} products`);
+            else fail(`Catalog unexpectedly small: ${products.length} products`);
+            if (uniqueIds.size === products.length) ok('Product IDs are unique');
+            else fail('Duplicate or invalid product IDs detected');
+            if (invalidPrices.length === 0) ok('All live product prices are positive numbers');
+            else fail(`${invalidPrices.length} product(s) have invalid prices`);
+            if (active.length > 0) ok(`${active.length} active product(s) remain available`);
+            else fail('No active products remain');
+
+            const sampleIds = [...new Set([
+              ids[0],
+              ids[Math.floor(ids.length / 2)],
+              ids.at(-1),
+            ].filter((v) => Number.isInteger(v)))];
+            for (const id of sampleIds) {
+              const detail = await json(`/api/products/${id}`);
+              if (detail.response.status === 200 && Number(detail.body?.id) === id) ok(`Product #${id} detail API is coherent`);
+              else fail(`Product #${id} detail API failed or returned mismatched data`);
+
+              const media = await json(`/api/products/${id}/media`);
+              if (media.response.status === 200 && Array.isArray(media.body?.items)) ok(`Product #${id} media API is coherent`);
+              else fail(`Product #${id} media API failed`);
+            }
+          }
+
+          const categories = await json('/api/categories');
+          if (categories.response.status === 200 && Array.isArray(categories.body) && categories.body.length >= 1) ok(`Categories API returned ${categories.body.length} categor${categories.body.length === 1 ? 'y' : 'ies'}`);
+          else fail(`Categories API invalid: HTTP ${categories.response.status}`);
+
+          const schema = await json('/api/db-schema');
+          if (
+            schema.response.status === 200 &&
+            schema.body?.status === 'ok' &&
+            schema.body?.migration === '0002_catalog_media_foundation.sql' &&
+            schema.body?.checks?.migrations &&
+            schema.body?.checks?.catalog_media_tables &&
+            schema.body?.checks?.product_columns
+          ) ok('Production D1 schema matches verified migration 0002');
+          else fail('Production D1 schema health check failed');
+
+          const missing = await request('/api/products/999999999');
+          if (missing.status === 404) ok('Missing-product API returns a real 404');
+          else fail(`Missing-product API expected 404, got ${missing.status}`);
+
+          for (const [path, label] of [
+            ['/api/orders', 'Orders'],
+            ['/api/customers', 'Customers'],
+            ['/api/media', 'Media library'],
+            ['/api/stats/dashboard', 'Dashboard stats'],
+          ]) {
+            const response = await request(path);
+            if (response.status === 401) ok(`${label} rejects unauthenticated access`);
+            else fail(`${label} expected 401 without auth, got ${response.status}`);
+          }
+
+          const checkout = await request('/checkout');
+          if (checkout.status === 200) ok('Checkout route is reachable');
+          else fail(`Checkout route expected 200, got ${checkout.status}`);
+
+          const report = [
+            '# AIPT commerce/data integrity watch',
+            '',
+            `Checked: ${new Date().toISOString()}`,
+            '',
+            ...checks,
+            '',
+            failures.length ? `**UNHEALTHY — ${failures.length} invariant(s) failed.**` : '**HEALTHY — all commerce/data invariants passed.**',
+            '',
+          ].join('\n');
+          fs.writeFileSync('/tmp/aipt-commerce-watch.md', report);
+          console.log(report);
+          if (failures.length) process.exit(1);
+          NODE
+          node /tmp/aipt-commerce-watch.mjs
+
+      - name: Open or refresh commerce/data incident
+        if: always() && steps.verify.outcome == 'failure' && github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TITLE='[watch] AIPT commerce/data integrity incident'
+          NUMBER=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"${TITLE}\") | .number" | head -n 1)
+          if [ -n "$NUMBER" ]; then
+            gh issue edit "$NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/aipt-commerce-watch.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file /tmp/aipt-commerce-watch.md
+          fi
+
+      - name: Close recovered commerce/data incident
+        if: always() && steps.verify.outcome == 'success' && github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TITLE='[watch] AIPT commerce/data integrity incident'
+          NUMBER=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"${TITLE}\") | .number" | head -n 1)
+          if [ -n "$NUMBER" ]; then
+            gh issue close "$NUMBER" --repo "$GITHUB_REPOSITORY" --comment 'Automatically closed after the commerce/data watchdog returned fully green.'
+          fi
+
+      - name: Fail workflow when an invariant failed
+        if: steps.verify.outcome == 'failure'
+        run: exit 1
