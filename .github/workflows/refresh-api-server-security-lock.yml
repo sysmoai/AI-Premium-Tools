@@ -59,6 +59,10 @@ jobs:
 
       - name: Verify patched dependency graph and full workspace quality
         shell: bash
+        env:
+          PORT: '8080'
+          BASE_PATH: '/'
+          VITE_SITE_URL: 'https://aipremium.tools'
         run: |
           set -euo pipefail
           pnpm install --frozen-lockfile
