@@ -1,0 +1,307 @@
+name: Verify AIPT R2 Media Live v3
+
+on:
+  push:
+    branches: [ops/verify-r2-media-live-v3]
+
+jobs:
+  verify-media:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: aipt-r2-live-verification
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install and validate
+        shell: bash
+        env:
+          PORT: '8080'
+          BASE_PATH: '/'
+          VITE_SITE_URL: 'https://aipremium.tools'
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm run typecheck
+          pnpm --filter @workspace/aipt-store run test
+          pnpm --filter @workspace/aipt-store run build
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ffmpeg
+          fi
+          printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > /tmp/aipt-ci-disposable-image.png
+          ffmpeg -loglevel error -f lavfi -i color=c=black:s=16x16:d=0.3 -an -c:v libx264 -pix_fmt yuv420p -movflags +faststart -y /tmp/aipt-ci-disposable-video.mp4
+          test -s /tmp/aipt-ci-disposable-image.png
+          test -s /tmp/aipt-ci-disposable-video.mp4
+
+      - name: Create isolated media verification preview
+        id: setup_preview
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RAW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EXPECTED_D1_DATABASE_ID: '9c19dfdb-aead-4bed-b6ff-f6bf379bc296'
+          EXPECTED_R2_BUCKET: 'aipt-media'
+          PROJECT_NAME: 'ai-premium-tools'
+          TEST_BRANCH: 'aipt-r2-media-ci-verify-v3'
+        run: |
+          set -euo pipefail
+          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim();if(!v)process.exit(1);process.stdout.write(v)')
+          account_id=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_ACCOUNT_ID||"").trim();if(!v)process.exit(1);process.stdout.write(v)')
+          session_secret=$(node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("hex"))')
+          admin_password=$(node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("hex"))')
+          cleanup_nonce=$(node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("hex"))')
+          admin_token=$(SESSION_SECRET="$session_secret" node -e 'const c=require("crypto");process.stdout.write(c.createHmac("sha256",process.env.SESSION_SECRET).update("aipt:admin:v1").digest("hex"))')
+          echo "::add-mask::$session_secret"
+          echo "::add-mask::$admin_password"
+          echo "::add-mask::$cleanup_nonce"
+          echo "::add-mask::$admin_token"
+
+          project_url="https://api.cloudflare.com/client/v4/accounts/${account_id}/pages/projects/${PROJECT_NAME}"
+          deployments_url="${project_url}/deployments"
+          curl --fail --silent --show-error --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' "$project_url" > /tmp/project-before.json
+          EXPECTED_D1_DATABASE_ID="$EXPECTED_D1_DATABASE_ID" EXPECTED_R2_BUCKET="$EXPECTED_R2_BUCKET" node <<'NODE'
+          const x=require('/tmp/project-before.json');
+          const prod=x?.result?.deployment_configs?.production||{};
+          const prev=x?.result?.deployment_configs?.preview||{};
+          if(prod.d1_databases?.DB?.id!==process.env.EXPECTED_D1_DATABASE_ID) throw new Error('Production D1 identity mismatch');
+          if(prod.r2_buckets?.MEDIA?.name!==process.env.EXPECTED_R2_BUCKET) throw new Error(`Production R2 identity mismatch: ${prod.r2_buckets?.MEDIA?.name}`);
+          for(const [label,present] of [
+            ['DB',Boolean(prev.d1_databases?.DB?.id)],
+            ['R2',Boolean(prev.r2_buckets?.MEDIA?.name)],
+            ['SESSION_SECRET',Boolean(prev.env_vars?.SESSION_SECRET)],
+            ['ADMIN_PASSWORD',Boolean(prev.env_vars?.ADMIN_PASSWORD)],
+            ['NONCE',Boolean(prev.env_vars?.AIPT_MEDIA_TEST_NONCE)],
+          ]) if(present) throw new Error(`Preview ${label} capability must be absent before test`);
+          console.log('Verified production D1 and R2 identities');
+          console.log('Verified preview temporary capabilities initially absent');
+          NODE
+
+          echo "AIPT_PREVIEW_OWNED=1" >> "$GITHUB_ENV"
+          echo "AIPT_ACCOUNT_ID=$account_id" >> "$GITHUB_ENV"
+          echo "AIPT_SESSION_SECRET=$session_secret" >> "$GITHUB_ENV"
+          echo "AIPT_ADMIN_PASSWORD=$admin_password" >> "$GITHUB_ENV"
+          echo "AIPT_CLEANUP_NONCE=$cleanup_nonce" >> "$GITHUB_ENV"
+          echo "AIPT_ADMIN_TOKEN=$admin_token" >> "$GITHUB_ENV"
+          echo "AIPT_TEST_BRANCH=$TEST_BRANCH" >> "$GITHUB_ENV"
+
+          cp scripts/ops/media-test-cleanup-pages-function.ts functions/__aipt_internal_cleanup_media.ts
+          payload=$(EXPECTED_D1_DATABASE_ID="$EXPECTED_D1_DATABASE_ID" EXPECTED_R2_BUCKET="$EXPECTED_R2_BUCKET" SESSION_SECRET="$session_secret" ADMIN_PASSWORD="$admin_password" TEST_NONCE="$cleanup_nonce" node -e 'process.stdout.write(JSON.stringify({deployment_configs:{preview:{d1_databases:{DB:{id:process.env.EXPECTED_D1_DATABASE_ID}},r2_buckets:{MEDIA:{name:process.env.EXPECTED_R2_BUCKET}},env_vars:{SESSION_SECRET:{type:"secret_text",value:process.env.SESSION_SECRET},ADMIN_PASSWORD:{type:"secret_text",value:process.env.ADMIN_PASSWORD},AIPT_MEDIA_TEST_NONCE:{type:"secret_text",value:process.env.TEST_NONCE}}}}}))')
+          curl --fail --silent --show-error --request PATCH --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' --data "$payload" "$project_url" > /tmp/preview-config.json
+          echo "AIPT_PREVIEW_CONFIGURED=1" >> "$GITHUB_ENV"
+
+          mv wrangler.toml /tmp/aipt-wrangler.toml
+          started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          set +e
+          CLOUDFLARE_API_TOKEN="$token" CLOUDFLARE_ACCOUNT_ID="$account_id" pnpm exec wrangler pages deploy artifacts/aipt-store/dist/public --project-name="$PROJECT_NAME" --branch="$TEST_BRANCH" > /tmp/deploy.txt 2>&1
+          deploy_code=$?
+          set -e
+          mv /tmp/aipt-wrangler.toml wrangler.toml
+          if [ $deploy_code -ne 0 ]; then
+            sed -n '1,100p' /tmp/deploy.txt | sed -E 's#https://[^ ]+#<preview-url>#g'
+            exit 1
+          fi
+
+          curl --fail --silent --show-error --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' "$deployments_url" > /tmp/deployments.json
+          TEST_BRANCH="$TEST_BRANCH" STARTED="$started" node <<'NODE' > /tmp/deployment-values.txt
+          const x=require('/tmp/deployments.json');
+          const start=Date.parse(process.env.STARTED);
+          const matches=(x.result||[]).filter(d=>d.environment==='preview'&&d.deployment_trigger?.metadata?.branch===process.env.TEST_BRANCH&&Date.parse(d.created_on)>=start-10000).sort((a,b)=>Date.parse(b.created_on)-Date.parse(a.created_on));
+          if(!matches.length) throw new Error('Could not identify verification deployment');
+          const d=matches[0], url=String(d.url||'').replace(/\/$/,'');
+          if(!/^https:\/\/[a-z0-9-]+\.ai-premium-tools\.pages\.dev$/i.test(url)) throw new Error('Unexpected preview URL');
+          process.stdout.write(`${d.id}\n${url}\n`);
+          NODE
+          deployment_id=$(sed -n '1p' /tmp/deployment-values.txt)
+          test_url=$(sed -n '2p' /tmp/deployment-values.txt)
+          echo "AIPT_TEST_DEPLOYMENT_ID=$deployment_id" >> "$GITHUB_ENV"
+          echo "AIPT_TEST_URL=$test_url" >> "$GITHUB_ENV"
+          echo "Isolated media verification preview ready"
+
+      - name: Sweep only stale disposable verification assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --request POST \
+            --header "Authorization: Bearer ${AIPT_CLEANUP_NONCE}" \
+            --header 'Content-Type: application/json' \
+            --data '{"action":"sweep"}' \
+            "${AIPT_TEST_URL}/__aipt_internal_cleanup_media" > /tmp/sweep.json
+          node -e 'const x=require("/tmp/sweep.json");if(!x.ok)throw new Error("Sweep failed");console.log(`Safely swept ${Number(x.swept||0)} stale disposable verification asset(s)`);'
+
+      - name: Verify media authentication and MIME validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=$(curl --silent --show-error --output /tmp/unauth.json --write-out '%{http_code}' --request POST "${AIPT_TEST_URL}/api/media/upload")
+          [ "$code" = "401" ] || { echo "Expected unauthenticated upload 401, got $code"; exit 1; }
+          code=$(curl --silent --show-error --output /tmp/invalid.json --write-out '%{http_code}' \
+            --header "Authorization: Bearer ${AIPT_ADMIN_TOKEN}" \
+            --form 'file=@/etc/hostname;type=text/plain;filename=aipt-ci-disposable-invalid.txt' \
+            --form 'alt_text=AIPT disposable media verification' \
+            "${AIPT_TEST_URL}/api/media/upload")
+          [ "$code" = "415" ] || { echo "Expected unsupported media 415, got $code"; exit 1; }
+          echo "Verified admin auth gate and MIME allowlist"
+
+      - name: Upload disposable image
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --header "Authorization: Bearer ${AIPT_ADMIN_TOKEN}" \
+            --form 'file=@/tmp/aipt-ci-disposable-image.png;type=image/png;filename=aipt-ci-disposable-image.png' \
+            --form 'alt_text=AIPT disposable media verification' \
+            --form 'caption=Automated disposable image verification' \
+            "${AIPT_TEST_URL}/api/media/upload" > /tmp/image-upload.json
+          node -e 'const x=require("/tmp/image-upload.json");if(!Number.isInteger(Number(x.id))||x.asset_type!=="image"||x.mime_type!=="image/png"||!String(x.key||"").startsWith("library/"))throw new Error("Unexpected image upload response");console.log(x.id);console.log(x.key);console.log(x.url);' > /tmp/image-values.txt
+          echo "AIPT_IMAGE_ID=$(sed -n '1p' /tmp/image-values.txt)" >> "$GITHUB_ENV"
+          echo "AIPT_IMAGE_KEY=$(sed -n '2p' /tmp/image-values.txt)" >> "$GITHUB_ENV"
+          echo "AIPT_IMAGE_PATH=$(sed -n '3p' /tmp/image-values.txt)" >> "$GITHUB_ENV"
+          echo "Verified disposable image upload to R2 with D1 metadata"
+
+      - name: Upload disposable video
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --header "Authorization: Bearer ${AIPT_ADMIN_TOKEN}" \
+            --form 'file=@/tmp/aipt-ci-disposable-video.mp4;type=video/mp4;filename=aipt-ci-disposable-video.mp4' \
+            --form 'alt_text=AIPT disposable media verification' \
+            --form 'caption=Automated disposable video verification' \
+            "${AIPT_TEST_URL}/api/media/upload" > /tmp/video-upload.json
+          node -e 'const x=require("/tmp/video-upload.json");if(!Number.isInteger(Number(x.id))||x.asset_type!=="video"||x.mime_type!=="video/mp4"||!String(x.key||"").startsWith("library/"))throw new Error("Unexpected video upload response");console.log(x.id);console.log(x.key);console.log(x.url);' > /tmp/video-values.txt
+          echo "AIPT_VIDEO_ID=$(sed -n '1p' /tmp/video-values.txt)" >> "$GITHUB_ENV"
+          echo "AIPT_VIDEO_KEY=$(sed -n '2p' /tmp/video-values.txt)" >> "$GITHUB_ENV"
+          echo "AIPT_VIDEO_PATH=$(sed -n '3p' /tmp/video-values.txt)" >> "$GITHUB_ENV"
+          echo "Verified disposable video upload to R2 with D1 metadata"
+
+      - name: Verify media library listing
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --header "Authorization: Bearer ${AIPT_ADMIN_TOKEN}" "${AIPT_TEST_URL}/api/media?search=aipt-ci-disposable-&limit=20" > /tmp/list.json
+          IMAGE_ID="$AIPT_IMAGE_ID" VIDEO_ID="$AIPT_VIDEO_ID" node -e 'const x=require("/tmp/list.json");const ids=new Set((x.items||[]).map(i=>Number(i.id)));if(!ids.has(Number(process.env.IMAGE_ID))||!ids.has(Number(process.env.VIDEO_ID)))throw new Error("Disposable media absent from admin library");console.log("Verified authenticated media library listing")'
+
+      - name: Verify exact image serving
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error -D /tmp/image.headers -o /tmp/image.download "${AIPT_TEST_URL}${AIPT_IMAGE_PATH}"
+          cmp /tmp/aipt-ci-disposable-image.png /tmp/image.download
+          grep -qi '^content-type: image/png' /tmp/image.headers
+          grep -qi '^etag:' /tmp/image.headers
+          grep -qi '^accept-ranges: bytes' /tmp/image.headers
+          echo "Verified image bytes, MIME, ETag and range capability"
+
+      - name: Verify video full and range serving
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error -D /tmp/video.headers -o /tmp/video.download "${AIPT_TEST_URL}${AIPT_VIDEO_PATH}"
+          cmp /tmp/aipt-ci-disposable-video.mp4 /tmp/video.download
+          grep -qi '^content-type: video/mp4' /tmp/video.headers
+          grep -qi '^etag:' /tmp/video.headers
+          grep -qi '^accept-ranges: bytes' /tmp/video.headers
+          code=$(curl --silent --show-error -D /tmp/range.headers -o /tmp/range.bin --write-out '%{http_code}' --header 'Range: bytes=0-15' "${AIPT_TEST_URL}${AIPT_VIDEO_PATH}")
+          [ "$code" = "206" ] || { echo "Expected range 206, got $code"; exit 1; }
+          head -c 16 /tmp/aipt-ci-disposable-video.mp4 > /tmp/range.expected
+          cmp /tmp/range.expected /tmp/range.bin
+          grep -qi '^content-range: bytes 0-15/' /tmp/range.headers
+          code=$(curl --silent --show-error -D /tmp/invalid-range.headers -o /tmp/invalid-range.bin --write-out '%{http_code}' --header 'Range: bytes=999999999-' "${AIPT_TEST_URL}${AIPT_VIDEO_PATH}")
+          [ "$code" = "416" ] || { echo "Expected invalid range 416, got $code"; exit 1; }
+          grep -qi '^content-range: bytes \*/' /tmp/invalid-range.headers
+          echo "Verified exact video bytes, 206 range delivery and 416 invalid range"
+
+      - name: Verify explicit disposable asset cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          body=$(IMAGE_ID="$AIPT_IMAGE_ID" IMAGE_KEY="$AIPT_IMAGE_KEY" VIDEO_ID="$AIPT_VIDEO_ID" VIDEO_KEY="$AIPT_VIDEO_KEY" node -e 'process.stdout.write(JSON.stringify({items:[{id:Number(process.env.IMAGE_ID),key:process.env.IMAGE_KEY},{id:Number(process.env.VIDEO_ID),key:process.env.VIDEO_KEY}]}))')
+          curl --fail --silent --show-error --request POST --header "Authorization: Bearer ${AIPT_CLEANUP_NONCE}" --header 'Content-Type: application/json' --data "$body" "${AIPT_TEST_URL}/__aipt_internal_cleanup_media" > /tmp/cleanup-assets.json
+          node -e 'const x=require("/tmp/cleanup-assets.json");if(!x.ok||x.deleted?.length!==2)throw new Error("Disposable cleanup verification failed");console.log("Verified exact disposable R2 objects and D1 rows deleted")'
+          echo "AIPT_ASSETS_CLEANED=1" >> "$GITHUB_ENV"
+          code1=$(curl --silent --show-error --output /tmp/image-after --write-out '%{http_code}' "${AIPT_TEST_URL}${AIPT_IMAGE_PATH}")
+          code2=$(curl --silent --show-error --output /tmp/video-after --write-out '%{http_code}' "${AIPT_TEST_URL}${AIPT_VIDEO_PATH}")
+          [ "$code1" = "404" ] && [ "$code2" = "404" ] || { echo "Expected cleaned media 404s, got image=$code1 video=$code2"; exit 1; }
+          echo "Verified cleaned R2 URLs return 404"
+
+      - name: Guaranteed preview and disposable cleanup
+        if: always()
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RAW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT_NAME: 'ai-premium-tools'
+          TEST_BRANCH: 'aipt-r2-media-ci-verify-v3'
+        run: |
+          set -u
+          result=0
+          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim();if(!v)process.exit(1);process.stdout.write(v)') || exit 1
+          account_id=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_ACCOUNT_ID||"").trim();if(!v)process.exit(1);process.stdout.write(v)') || exit 1
+          project_url="https://api.cloudflare.com/client/v4/accounts/${account_id}/pages/projects/${PROJECT_NAME}"
+          deployments_url="${project_url}/deployments"
+
+          cf_get() { curl --fail --silent --show-error --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' "$1"; }
+          cf_patch() { curl --fail --silent --show-error --request PATCH --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' --data "$2" "$1"; }
+
+          if [ "${AIPT_PREVIEW_OWNED:-0}" = "1" ]; then
+            cleanup_url="${AIPT_TEST_URL:-}"
+            if [ -z "$cleanup_url" ]; then
+              cf_get "$deployments_url" > /tmp/cleanup-deployments.json || result=1
+              if [ -f /tmp/cleanup-deployments.json ]; then
+                cleanup_url=$(TEST_BRANCH="$TEST_BRANCH" node -e 'const x=require("/tmp/cleanup-deployments.json");const m=(x.result||[]).filter(d=>d.environment==="preview"&&d.deployment_trigger?.metadata?.branch===process.env.TEST_BRANCH).sort((a,b)=>Date.parse(b.created_on)-Date.parse(a.created_on));process.stdout.write(String(m[0]?.url||"").replace(/\/$/,""))' 2>/dev/null || true)
+              fi
+            fi
+
+            if [ -n "$cleanup_url" ] && [ -n "${AIPT_CLEANUP_NONCE:-}" ]; then
+              code=$(curl --silent --show-error --output /tmp/final-sweep.json --write-out '%{http_code}' --request POST --header "Authorization: Bearer ${AIPT_CLEANUP_NONCE}" --header 'Content-Type: application/json' --data '{"action":"sweep"}' "${cleanup_url}/__aipt_internal_cleanup_media" || true)
+              if [ "$code" = "200" ]; then
+                node -e 'const x=require("/tmp/final-sweep.json");console.log(`Final disposable sweep removed ${Number(x.swept||0)} asset(s)`);' || result=1
+              elif [ -n "${AIPT_IMAGE_ID:-}${AIPT_VIDEO_ID:-}" ] && [ "${AIPT_ASSETS_CLEANED:-0}" != "1" ]; then
+                echo "ERROR: final disposable media sweep failed with HTTP $code"
+                result=1
+              fi
+            fi
+
+            cf_patch "$project_url" '{"deployment_configs":{"preview":{"d1_databases":{"DB":null},"r2_buckets":{"MEDIA":null},"env_vars":{"SESSION_SECRET":null,"ADMIN_PASSWORD":null,"AIPT_MEDIA_TEST_NONCE":null}}}}' > /tmp/preview-remove.json || result=1
+            rm -f functions/__aipt_internal_cleanup_media.ts
+
+            if [ -d artifacts/aipt-store/dist/public ]; then
+              mv wrangler.toml /tmp/aipt-wrangler.toml 2>/dev/null || true
+              CLOUDFLARE_API_TOKEN="$token" CLOUDFLARE_ACCOUNT_ID="$account_id" pnpm exec wrangler pages deploy artifacts/aipt-store/dist/public --project-name="$PROJECT_NAME" --branch="$TEST_BRANCH" > /tmp/clean-deploy.txt 2>&1 || result=1
+              mv /tmp/aipt-wrangler.toml wrangler.toml 2>/dev/null || true
+            fi
+
+            cf_get "$deployments_url" > /tmp/clean-deployments.json || result=1
+            if [ -f /tmp/clean-deployments.json ]; then
+              TEST_BRANCH="$TEST_BRANCH" node <<'NODE' > /tmp/delete-ids.txt || result=1
+          const x=require('/tmp/clean-deployments.json');
+          const m=(x.result||[]).filter(d=>d.environment==='preview'&&d.deployment_trigger?.metadata?.branch===process.env.TEST_BRANCH).sort((a,b)=>Date.parse(b.created_on)-Date.parse(a.created_on));
+          if(!m.length) throw new Error('No clean test branch deployment found');
+          const n=m[0];
+          if((n.d1_databases?.DB?.id??null)!==null||(n.r2_buckets?.MEDIA?.name??null)!==null||(n.env_vars?.SESSION_SECRET??null)!==null||(n.env_vars?.ADMIN_PASSWORD??null)!==null||(n.env_vars?.AIPT_MEDIA_TEST_NONCE??null)!==null) throw new Error('Newest test deployment still has temporary capabilities');
+          for(const d of m.slice(1)) console.log(d.id);
+          NODE
+              while IFS= read -r id; do
+                [ -z "$id" ] && continue
+                code=$(curl --silent --show-error --output /tmp/delete.json --write-out '%{http_code}' --request DELETE --header "Authorization: Bearer ${token}" --header 'Content-Type: application/json' "${deployments_url}/${id}?force=true" || true)
+                if [ "$code" != "200" ] && [ "$code" != "204" ]; then result=1; fi
+              done < /tmp/delete-ids.txt
+            fi
+
+            cf_get "$project_url" > /tmp/project-clean.json || result=1
+            if [ -f /tmp/project-clean.json ]; then
+              node -e 'const x=require("/tmp/project-clean.json");const p=x.result?.deployment_configs?.preview||{};for(const v of [p.d1_databases?.DB?.id,p.r2_buckets?.MEDIA?.name,p.env_vars?.SESSION_SECRET,p.env_vars?.ADMIN_PASSWORD,p.env_vars?.AIPT_MEDIA_TEST_NONCE])if(v!=null)throw new Error("Temporary preview capability remains");console.log("Verified all temporary preview bindings/secrets removed")' || result=1
+            fi
+          fi
+
+          unset token account_id
+          exit "$result"
