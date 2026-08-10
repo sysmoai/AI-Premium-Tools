@@ -1,0 +1,251 @@
+name: Continuous AIPT Production Monitor
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+  workflow_run:
+    workflows: ['Validate and Deploy AIPT']
+    types: [completed]
+  pull_request:
+    paths:
+      - '.github/workflows/continuous-production-monitor.yml'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: aipt-production-monitor
+  cancel-in-progress: true
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Probe canonical production
+        shell: bash
+        run: |
+          set -u
+          BASE='https://aipremium.tools'
+          REPORT='/tmp/aipt-monitor-report.md'
+          FAILURES=0
+
+          printf '# AIPT production monitor\n\n' > "$REPORT"
+          printf -- '- Checked: %s UTC\n' "$(date -u '+%Y-%m-%d %H:%M:%S')" >> "$REPORT"
+          printf -- '- Trigger: `%s`\n\n' "${GITHUB_EVENT_NAME}" >> "$REPORT"
+
+          record_failure() {
+            FAILURES=$((FAILURES + 1))
+            printf -- '- ❌ %s\n' "$1" | tee -a "$REPORT"
+          }
+
+          record_success() {
+            printf -- '- ✅ %s\n' "$1" | tee -a "$REPORT"
+          }
+
+          fetch() {
+            local path="$1"
+            local out="$2"
+            local method="${3:-GET}"
+            local result code elapsed
+            result=$(curl --silent --show-error --location \
+              --connect-timeout 8 --max-time 20 --retry 2 --retry-delay 1 \
+              --request "$method" --output "$out" --write-out '%{http_code} %{time_total}' \
+              "${BASE}${path}" 2>/tmp/aipt-curl-error.txt) || result='000 99'
+            code=$(printf '%s' "$result" | awk '{print $1}')
+            elapsed=$(printf '%s' "$result" | awk '{print $2}')
+            printf '%s %s' "$code" "$elapsed"
+          }
+
+          check_200() {
+            local path="$1"
+            local label="$2"
+            local safe_name
+            safe_name=$(printf '%s' "$path" | tr '/?&=' '____')
+            local result code elapsed
+            result=$(fetch "$path" "/tmp/${safe_name}.body")
+            code=$(printf '%s' "$result" | awk '{print $1}')
+            elapsed=$(printf '%s' "$result" | awk '{print $2}')
+            if [ "$code" = '200' ]; then
+              record_success "${label} returned 200 (${elapsed}s)"
+            else
+              record_failure "${label} expected 200, got ${code}"
+            fi
+          }
+
+          printf '## Public routes\n' >> "$REPORT"
+          check_200 '/' 'Homepage'
+          check_200 '/products' 'Products'
+          check_200 '/cart' 'Cart'
+          check_200 '/checkout' 'Checkout'
+          check_200 '/track-order' 'Order tracking'
+          check_200 '/faq' 'FAQ'
+          check_200 '/about' 'About'
+          check_200 '/contact' 'Contact'
+          check_200 '/shipping-policy' 'Shipping policy'
+          check_200 '/refund-policy' 'Refund policy'
+          check_200 '/privacy-policy' 'Privacy policy'
+          check_200 '/terms' 'Terms'
+
+          printf '\n## APIs and schema\n' >> "$REPORT"
+          health_result=$(fetch '/api/healthz' '/tmp/health.json')
+          health_code=$(printf '%s' "$health_result" | awk '{print $1}')
+          if [ "$health_code" = '200' ] && node -e 'const x=require("/tmp/health.json"); if(x?.status!=="ok") process.exit(1)' 2>/dev/null; then
+            record_success 'Health API reports status=ok'
+          else
+            record_failure "Health API failed (HTTP ${health_code})"
+          fi
+
+          products_result=$(fetch '/api/products' '/tmp/products.json')
+          products_code=$(printf '%s' "$products_result" | awk '{print $1}')
+          if [ "$products_code" = '200' ]; then
+            product_count=$(node -e 'const x=require("/tmp/products.json"); if(!Array.isArray(x)||x.length<1) process.exit(1); process.stdout.write(String(x.length))' 2>/dev/null || true)
+            if [ -n "$product_count" ]; then
+              record_success "Products API returned ${product_count} product(s)"
+            else
+              record_failure 'Products API did not return a non-empty array'
+            fi
+          else
+            record_failure "Products API expected 200, got ${products_code}"
+          fi
+
+          schema_result=$(fetch '/api/db-schema' '/tmp/db-schema.json')
+          schema_code=$(printf '%s' "$schema_result" | awk '{print $1}')
+          if [ "$schema_code" = '200' ] && node -e 'const x=require("/tmp/db-schema.json"); if(x?.status!=="ok"||x?.migration!=="0002_catalog_media_foundation.sql"||!x?.checks?.migrations||!x?.checks?.catalog_media_tables||!x?.checks?.product_columns) process.exit(1)' 2>/dev/null; then
+            record_success 'D1 schema health matches verified migration 0002'
+          else
+            record_failure "D1 schema health check failed (HTTP ${schema_code})"
+          fi
+
+          if [ -s /tmp/products.json ]; then
+            first_product=$(node -e 'const x=require("/tmp/products.json"); const p=Array.isArray(x)?x.find(v=>Number.isInteger(Number(v?.id))):null; if(p) process.stdout.write(String(p.id))' 2>/dev/null || true)
+            if [ -n "$first_product" ]; then
+              detail_result=$(fetch "/api/products/${first_product}" '/tmp/product-detail.json')
+              detail_code=$(printf '%s' "$detail_result" | awk '{print $1}')
+              if [ "$detail_code" = '200' ] && node -e 'const x=require("/tmp/product-detail.json"); if(!Number.isInteger(Number(x?.id))) process.exit(1)' 2>/dev/null; then
+                record_success "Product detail API works for product #${first_product}"
+              else
+                record_failure "Product detail API failed for product #${first_product}"
+              fi
+
+              media_result=$(fetch "/api/products/${first_product}/media" '/tmp/product-media.json')
+              media_code=$(printf '%s' "$media_result" | awk '{print $1}')
+              if [ "$media_code" = '200' ] && node -e 'const x=require("/tmp/product-media.json"); if(!Array.isArray(x?.items)) process.exit(1)' 2>/dev/null; then
+                record_success "Public product-media API works for product #${first_product}"
+              else
+                record_failure "Public product-media API failed for product #${first_product}"
+              fi
+            else
+              record_failure 'Could not identify a product ID for synthetic API checks'
+            fi
+          fi
+
+          printf '\n## Security gates\n' >> "$REPORT"
+          for spec in \
+            '/api/media|Media library' \
+            '/api/customers|Customer list' \
+            '/api/orders|Order list' \
+            '/api/stats/dashboard|Admin dashboard stats'; do
+            path=${spec%%|*}
+            label=${spec#*|}
+            result=$(fetch "$path" '/tmp/protected.json')
+            code=$(printf '%s' "$result" | awk '{print $1}')
+            if [ "$code" = '401' ]; then
+              record_success "${label} rejects unauthenticated access"
+            else
+              record_failure "${label} expected unauthenticated 401, got ${code}"
+            fi
+          done
+
+          upload_result=$(fetch '/api/media/upload' '/tmp/upload-protected.json' 'POST')
+          upload_code=$(printf '%s' "$upload_result" | awk '{print $1}')
+          if [ "$upload_code" = '401' ]; then
+            record_success 'Media upload rejects unauthenticated POST'
+          else
+            record_failure "Media upload expected unauthenticated 401, got ${upload_code}"
+          fi
+
+          printf '\n## SEO and machine-readable assets\n' >> "$REPORT"
+          robots_result=$(fetch '/robots.txt' '/tmp/robots.txt')
+          robots_code=$(printf '%s' "$robots_result" | awk '{print $1}')
+          if [ "$robots_code" = '200' ] && grep -Eqi '^Sitemap:[[:space:]]*https://aipremium\.tools/sitemap\.xml' /tmp/robots.txt; then
+            record_success 'robots.txt is live and declares the canonical sitemap'
+          else
+            record_failure "robots.txt/sitemap declaration check failed (HTTP ${robots_code})"
+          fi
+
+          sitemap_result=$(fetch '/sitemap.xml' '/tmp/sitemap.xml')
+          sitemap_code=$(printf '%s' "$sitemap_result" | awk '{print $1}')
+          if [ "$sitemap_code" = '200' ] && grep -q '<urlset' /tmp/sitemap.xml && grep -q 'https://aipremium.tools/' /tmp/sitemap.xml; then
+            sitemap_urls=$(grep -o '<loc>' /tmp/sitemap.xml | wc -l | tr -d ' ')
+            record_success "sitemap.xml is live with ${sitemap_urls} URL entries"
+          else
+            record_failure "sitemap.xml validation failed (HTTP ${sitemap_code})"
+          fi
+
+          llms_result=$(fetch '/llms.txt' '/tmp/llms.txt')
+          llms_code=$(printf '%s' "$llms_result" | awk '{print $1}')
+          if [ "$llms_code" = '200' ] && [ "$(wc -c < /tmp/llms.txt)" -gt 500 ]; then
+            record_success 'llms.txt is live and non-trivial'
+          else
+            record_failure "llms.txt validation failed (HTTP ${llms_code})"
+          fi
+
+          manifest_result=$(fetch '/manifest.webmanifest' '/tmp/manifest.json')
+          manifest_code=$(printf '%s' "$manifest_result" | awk '{print $1}')
+          if [ "$manifest_code" = '200' ] && node -e 'const x=require("/tmp/manifest.json"); if(!x?.name||!x?.start_url) process.exit(1)' 2>/dev/null; then
+            record_success 'Web app manifest is live and valid JSON'
+          else
+            record_failure "Web app manifest validation failed (HTTP ${manifest_code})"
+          fi
+
+          printf '\n## Result\n' >> "$REPORT"
+          if [ "$FAILURES" -eq 0 ]; then
+            printf '**HEALTHY** — all monitored production invariants passed.\n' | tee -a "$REPORT"
+          else
+            printf '**UNHEALTHY** — %s monitored invariant(s) failed.\n' "$FAILURES" | tee -a "$REPORT"
+          fi
+
+          cat "$REPORT" >> "$GITHUB_STEP_SUMMARY"
+          echo "failures=${FAILURES}" >> "$GITHUB_OUTPUT"
+          if [ "$FAILURES" -ne 0 ]; then
+            exit 1
+          fi
+        id: production_probe
+
+      - name: Open or update production incident
+        if: failure() && github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TITLE='[monitor] AIPT production health incident'
+          NUMBER=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"${TITLE}\") | .number" | head -n 1)
+          if [ -n "$NUMBER" ]; then
+            gh issue comment "$NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/aipt-monitor-report.md
+            echo "Updated existing production incident #${NUMBER}."
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file /tmp/aipt-monitor-report.md
+            echo 'Opened a production incident.'
+          fi
+
+      - name: Close recovered production incident
+        if: success() && github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TITLE='[monitor] AIPT production health incident'
+          NUMBER=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"${TITLE}\") | .number" | head -n 1)
+          if [ -n "$NUMBER" ]; then
+            gh issue comment "$NUMBER" --repo "$GITHUB_REPOSITORY" --body "Production recovered at $(date -u '+%Y-%m-%d %H:%M:%S UTC'). The continuous monitor is green again."
+            gh issue close "$NUMBER" --repo "$GITHUB_REPOSITORY" --comment 'Automatically closing after a fully green production monitor run.'
+            echo "Closed recovered production incident #${NUMBER}."
+          else
+            echo 'No open production incident to close.'
+          fi
