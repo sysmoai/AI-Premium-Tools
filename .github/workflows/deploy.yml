@@ -1,11 +1,13 @@
-name: Deploy to Cloudflare Pages
+name: Validate and Deploy AIPT
 
 on:
+  pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  validate:
     runs-on: ubuntu-latest
 
     steps:
@@ -32,6 +34,42 @@ jobs:
       - name: Test storefront
         run: pnpm --filter @workspace/aipt-store run test
 
+      - name: Validate D1 migrations locally
+        run: pnpm exec wrangler d1 migrations apply aipt-db --local
+
+      - name: Build storefront
+        run: pnpm --filter @workspace/aipt-store run build
+        env:
+          PORT: '8080'
+          BASE_PATH: '/'
+          VITE_SITE_URL: 'https://aipremium.tools'
+
+  deploy-production:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    concurrency:
+      group: aipt-production
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Build storefront
         run: pnpm --filter @workspace/aipt-store run build
         env:
@@ -45,3 +83,12 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy artifacts/aipt-store/dist/public --project-name=ai-premium-tools
+
+      - name: Verify canonical production
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 https://aipremium.tools/ > /dev/null
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 https://aipremium.tools/api/healthz | grep -q '"status":"ok"'
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 https://aipremium.tools/api/products > /tmp/aipt-products.json
+          node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("/tmp/aipt-products.json","utf8")); if(!Array.isArray(x) || x.length===0) process.exit(1); console.log(`Verified ${x.length} products from production API`);'
