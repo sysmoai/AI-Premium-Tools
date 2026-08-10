@@ -64,7 +64,7 @@ jobs:
 
             if [ -z "$created" ]; then
               echo "- ❌ ${label}: no main-branch workflow run found; dispatching now." | tee -a "$REPORT"
-              gh workflow run "$workflow" --ref main || true
+              gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref main || true
               FAILURES=$((FAILURES + 1))
               return
             fi
@@ -73,7 +73,7 @@ jobs:
             age_minutes=$((age_seconds / 60))
             if [ "$age_minutes" -gt "$max_age_minutes" ]; then
               echo "- ⚠️ ${label}: last run is ${age_minutes}m old (limit ${max_age_minutes}m); dispatching recovery run." | tee -a "$REPORT"
-              gh workflow run "$workflow" --ref main || true
+              gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref main || true
               FAILURES=$((FAILURES + 1))
             else
               echo "- ✅ ${label}: fresh (${age_minutes}m old; status=${status}; conclusion=${conclusion})." | tee -a "$REPORT"
