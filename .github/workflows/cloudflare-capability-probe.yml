@@ -55,19 +55,58 @@ jobs:
           probe "Account token permission groups" "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/tokens/permission_groups?name=D1%20Edit"
           probe "Account IAM permission groups" "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/iam/permission_groups"
 
+          project_url="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/ai-premium-tools"
           curl --fail --silent --show-error \
             --header "Authorization: Bearer ${normalized_token}" \
             --header "Content-Type: application/json" \
-            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/ai-premium-tools" \
-            > /tmp/aipt-pages-project.json
+            "$project_url" > /tmp/aipt-pages-project.json
+
           D1_DATABASE_ID="$D1_DATABASE_ID" node <<'NODE'
           const fs = require('fs');
           const x = JSON.parse(fs.readFileSync('/tmp/aipt-pages-project.json', 'utf8'));
           const production = x?.result?.deployment_configs?.production?.d1_databases?.DB?.id ?? null;
           const preview = x?.result?.deployment_configs?.preview?.d1_databases?.DB?.id ?? null;
+          if (preview) throw new Error('Refusing preview-binding capability test because preview DB binding was not empty at start');
           console.log(`Production Pages DB matches expected: ${production === process.env.D1_DATABASE_ID}`);
-          console.log(`Preview Pages DB matches production: ${Boolean(preview && production && preview === production)}`);
-          console.log(`Preview Pages DB binding present: ${Boolean(preview)}`);
+          console.log('Preview Pages DB binding initially absent: true');
           NODE
-          rm -f /tmp/aipt-pages-project.json
-          unset normalized_token
+
+          add_payload=$(D1_DATABASE_ID="$D1_DATABASE_ID" node -e 'process.stdout.write(JSON.stringify({deployment_configs:{preview:{d1_databases:{DB:{id:process.env.D1_DATABASE_ID}}}}}))')
+          add_status=$(curl --silent --show-error --output /tmp/aipt-pages-patch-add.json --write-out '%{http_code}' \
+            --request PATCH \
+            --header "Authorization: Bearer ${normalized_token}" \
+            --header "Content-Type: application/json" \
+            --data "$add_payload" \
+            "$project_url")
+          if [ "$add_status" != "200" ]; then
+            echo "Preview DB binding add failed with HTTP $add_status"
+            cat /tmp/aipt-pages-patch-add.json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const x=JSON.parse(s);for(const e of x.errors||[])console.error(`Cloudflare error ${e.code}: ${e.message}`)}catch{}})'
+            exit 1
+          fi
+
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${normalized_token}" \
+            --header "Content-Type: application/json" \
+            "$project_url" > /tmp/aipt-pages-after-add.json
+          D1_DATABASE_ID="$D1_DATABASE_ID" node -e 'const x=require("/tmp/aipt-pages-after-add.json"); const id=x?.result?.deployment_configs?.preview?.d1_databases?.DB?.id; if(id!==process.env.D1_DATABASE_ID) throw new Error("Preview DB binding did not match expected database after PATCH"); console.log("Preview DB binding add verified: true")'
+
+          remove_payload='{"deployment_configs":{"preview":{"d1_databases":{"DB":null}}}}'
+          remove_status=$(curl --silent --show-error --output /tmp/aipt-pages-patch-remove.json --write-out '%{http_code}' \
+            --request PATCH \
+            --header "Authorization: Bearer ${normalized_token}" \
+            --header "Content-Type: application/json" \
+            --data "$remove_payload" \
+            "$project_url")
+          if [ "$remove_status" != "200" ]; then
+            echo "Preview DB binding cleanup failed with HTTP $remove_status"
+            exit 1
+          fi
+
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${normalized_token}" \
+            --header "Content-Type: application/json" \
+            "$project_url" > /tmp/aipt-pages-after-remove.json
+          node -e 'const x=require("/tmp/aipt-pages-after-remove.json"); const id=x?.result?.deployment_configs?.preview?.d1_databases?.DB?.id ?? null; if(id!==null) throw new Error("Preview DB binding cleanup did not restore absence"); console.log("Preview DB binding cleanup verified: true")'
+
+          rm -f /tmp/aipt-pages-*.json
+          unset normalized_token add_payload remove_payload
