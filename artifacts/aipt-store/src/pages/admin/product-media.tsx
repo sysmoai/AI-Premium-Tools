@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSeo } from "@/hooks/use-seo";
 import { listMedia, type MediaAsset } from "@/lib/admin-media-api";
 import { getProductMedia, saveProductMedia, type ProductMediaItem } from "@/lib/product-media-api";
-import { useGetProduct } from "@workspace/api-client-react";
+import { getGetProductQueryKey, useGetProduct } from "@workspace/api-client-react";
 
 type EditableMedia = ProductMediaItem;
 
@@ -44,7 +44,10 @@ export default function AdminProductMedia() {
   const [saving, setSaving] = useState(false);
 
   const { data: product } = useGetProduct(productId, {
-    query: { enabled: Number.isInteger(productId) && productId > 0 },
+    query: {
+      enabled: Number.isInteger(productId) && productId > 0,
+      queryKey: getGetProductQueryKey(productId),
+    },
   });
 
   async function load() {
