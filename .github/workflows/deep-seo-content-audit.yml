@@ -1,0 +1,282 @@
+name: Deep AIPT SEO and Content Audit
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+  workflow_run:
+    workflows: ['Validate and Deploy AIPT']
+    types: [completed]
+  pull_request:
+    paths:
+      - '.github/workflows/deep-seo-content-audit.yml'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: aipt-deep-seo-content-audit
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Crawl catalog, sitemap and content quality
+        id: audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/aipt-deep-audit.mjs <<'NODE'
+          import fs from 'node:fs';
+
+          const BASE = 'https://aipremium.tools';
+          const findings = [];
+          const info = [];
+
+          function add(severity, title, detail) {
+            findings.push({ severity, title, detail });
+          }
+
+          async function get(path, { redirect = 'follow' } = {}) {
+            const response = await fetch(`${BASE}${path}`, {
+              redirect,
+              headers: { 'user-agent': 'AIPT-Deep-Audit/1.0' },
+              signal: AbortSignal.timeout(20000),
+            });
+            return response;
+          }
+
+          async function json(path) {
+            const response = await get(path);
+            if (!response.ok) throw new Error(`${path} returned HTTP ${response.status}`);
+            return response.json();
+          }
+
+          async function text(path) {
+            const response = await get(path);
+            if (!response.ok) throw new Error(`${path} returned HTTP ${response.status}`);
+            return response.text();
+          }
+
+          async function pool(items, concurrency, fn) {
+            const results = new Array(items.length);
+            let cursor = 0;
+            async function worker() {
+              while (true) {
+                const index = cursor++;
+                if (index >= items.length) return;
+                try {
+                  results[index] = { ok: true, value: await fn(items[index], index) };
+                } catch (error) {
+                  results[index] = { ok: false, error: error instanceof Error ? error.message : String(error) };
+                }
+              }
+            }
+            await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(1, items.length)) }, () => worker()));
+            return results;
+          }
+
+          const [products, sitemap, robots, llms] = await Promise.all([
+            json('/api/products'),
+            text('/sitemap.xml'),
+            text('/robots.txt'),
+            text('/llms.txt'),
+          ]);
+
+          if (!Array.isArray(products) || products.length === 0) {
+            add('P0', 'Catalog API is empty', 'The live products API returned no products.');
+          }
+          info.push(`Live products: ${Array.isArray(products) ? products.length : 0}`);
+
+          const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1].trim());
+          const uniqueLocs = new Set(locs);
+          info.push(`Sitemap URLs: ${locs.length}`);
+
+          if (locs.length === 0) add('P0', 'Sitemap has no URLs', 'No <loc> entries were found in /sitemap.xml.');
+          if (uniqueLocs.size !== locs.length) {
+            add('P1', 'Sitemap contains duplicate URLs', `${locs.length - uniqueLocs.size} duplicate <loc> entries were detected.`);
+          }
+
+          const external = locs.filter((url) => !url.startsWith(`${BASE}/`) && url !== `${BASE}/`);
+          if (external.length) add('P0', 'Sitemap contains non-canonical hosts', external.slice(0, 10).join('\n'));
+
+          const sensitiveFragments = ['/admin', '/cart', '/checkout', '/order-success/'];
+          const sensitive = locs.filter((url) => sensitiveFragments.some((fragment) => new URL(url).pathname.startsWith(fragment)));
+          if (sensitive.length) add('P0', 'Sensitive/non-indexable routes are in the sitemap', sensitive.slice(0, 20).join('\n'));
+
+          if (!/^Sitemap:\s*https:\/\/aipremium\.tools\/sitemap\.xml/im.test(robots)) {
+            add('P0', 'robots.txt does not declare the canonical sitemap', 'Expected Sitemap: https://aipremium.tools/sitemap.xml');
+          }
+          for (const path of ['/admin', '/checkout', '/cart', '/order-success/']) {
+            if (!robots.includes(`Disallow: ${path}`)) add('P1', `robots.txt is missing ${path} protection`, `Expected a Disallow rule for ${path}.`);
+          }
+          if (llms.length < 500) add('P1', 'llms.txt is unexpectedly thin', `Current size is ${llms.length} bytes.`);
+
+          const expectedStatic = [
+            '/', '/products', '/track-order', '/faq', '/about', '/contact',
+            '/shipping-policy', '/refund-policy', '/privacy-policy', '/terms',
+          ];
+          for (const path of expectedStatic) {
+            const url = `${BASE}${path}`;
+            if (!uniqueLocs.has(url)) add('P1', 'Indexable static route missing from sitemap', url);
+          }
+
+          const productIds = products
+            .map((product) => Number(product?.id))
+            .filter((id) => Number.isInteger(id) && id > 0);
+          const missingProductUrls = productIds.filter((id) => !uniqueLocs.has(`${BASE}/products/${id}`));
+          if (missingProductUrls.length) {
+            add('P0', 'Live products are missing from the sitemap', `Missing product IDs: ${missingProductUrls.slice(0, 30).join(', ')}${missingProductUrls.length > 30 ? '…' : ''}`);
+          }
+
+          const crawlResults = await pool(locs, 10, async (url) => {
+            const response = await fetch(url, {
+              redirect: 'follow',
+              headers: { 'user-agent': 'AIPT-Deep-Audit/1.0' },
+              signal: AbortSignal.timeout(20000),
+            });
+            return { url, status: response.status, finalUrl: response.url };
+          });
+          const broken = [];
+          const offCanonicalRedirects = [];
+          for (let i = 0; i < crawlResults.length; i++) {
+            const result = crawlResults[i];
+            if (!result.ok) {
+              broken.push(`${locs[i]} — ${result.error}`);
+              continue;
+            }
+            if (result.value.status >= 400) broken.push(`${result.value.url} — HTTP ${result.value.status}`);
+            if (!result.value.finalUrl.startsWith(BASE)) offCanonicalRedirects.push(`${result.value.url} → ${result.value.finalUrl}`);
+          }
+          if (broken.length) add('P0', 'Sitemap URLs are broken', broken.slice(0, 30).join('\n'));
+          if (offCanonicalRedirects.length) add('P1', 'Sitemap URLs redirect off canonical host', offCanonicalRedirects.slice(0, 20).join('\n'));
+
+          const invalidApi = await get('/api/products/999999999', { redirect: 'manual' });
+          const invalidPage = await get('/products/999999999', { redirect: 'manual' });
+          if (invalidApi.status === 404 && invalidPage.status === 200) {
+            add(
+              'P1',
+              'Product detail routes still have a soft-404 SEO pattern',
+              'The product API correctly returns 404 for an impossible product, but /products/999999999 returns HTTP 200. Add an edge/server response strategy so missing product pages return a real 404 while preserving the SPA UX.',
+            );
+          }
+
+          const missingSlugs = products.filter((p) => !String(p?.slug ?? '').trim());
+          const missingSeoTitles = products.filter((p) => !String(p?.seo_title ?? '').trim());
+          const missingSeoDescriptions = products.filter((p) => !String(p?.seo_description ?? '').trim());
+          const missingShortDescriptions = products.filter((p) => !String(p?.short_description ?? '').trim());
+          const shortDescriptions = products.filter((p) => String(p?.description ?? '').trim().length < 80);
+          const missingFeatures = products.filter((p) => !Array.isArray(p?.features) || p.features.length === 0);
+          const invalidPrices = products.filter((p) => !Number.isFinite(Number(p?.price_bdt)) || Number(p.price_bdt) <= 0);
+          const holdProducts = products.filter((p) => String(p?.commercial_state ?? '').toUpperCase() === 'HOLD');
+
+          if (missingSlugs.length) add('P1', 'Products are missing stable SEO slugs', `${missingSlugs.length}/${products.length} products have no slug. Dedicated canonical product URLs should move from numeric-only routes to stable slugs with redirects.`);
+          if (missingSeoTitles.length) add('P1', 'Products are missing explicit SEO titles', `${missingSeoTitles.length}/${products.length} products have no seo_title.`);
+          if (missingSeoDescriptions.length) add('P1', 'Products are missing explicit SEO descriptions', `${missingSeoDescriptions.length}/${products.length} products have no seo_description.`);
+          if (missingShortDescriptions.length) add('P2', 'Products are missing short descriptions', `${missingShortDescriptions.length}/${products.length} products have no short_description.`);
+          if (shortDescriptions.length) add('P2', 'Some product descriptions are thin', `${shortDescriptions.length}/${products.length} product descriptions are under 80 characters.`);
+          if (missingFeatures.length) add('P2', 'Some products have no feature bullets', `${missingFeatures.length}/${products.length} products have no feature list.`);
+          if (invalidPrices.length) add('P0', 'Products have invalid prices', `Affected product IDs: ${invalidPrices.map((p) => p.id).slice(0, 30).join(', ')}`);
+          if (holdProducts.length) info.push(`Commercial HOLD products: ${holdProducts.length}/${products.length}`);
+
+          const mediaResults = await pool(productIds, 10, async (id) => {
+            const payload = await json(`/api/products/${id}/media`);
+            if (!Array.isArray(payload?.items)) throw new Error('items is not an array');
+            return { id, count: payload.items.length };
+          });
+          const mediaFailures = [];
+          const productsWithoutFirstPartyMedia = [];
+          for (let i = 0; i < mediaResults.length; i++) {
+            const result = mediaResults[i];
+            if (!result.ok) mediaFailures.push(`Product #${productIds[i]} — ${result.error}`);
+            else if (result.value.count === 0) productsWithoutFirstPartyMedia.push(result.value.id);
+          }
+          if (mediaFailures.length) add('P0', 'Product-media API failures detected', mediaFailures.slice(0, 30).join('\n'));
+          if (productsWithoutFirstPartyMedia.length) {
+            add('P2', 'Products still need first-party image/video galleries', `${productsWithoutFirstPartyMedia.length}/${productIds.length} products currently have zero product_media relationships. Prioritize original screenshots, product walkthrough images, and short demo videos where legally/contractually appropriate.`);
+          }
+
+          const severityOrder = { P0: 0, P1: 1, P2: 2 };
+          findings.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity] || a.title.localeCompare(b.title));
+          const counts = findings.reduce((acc, finding) => {
+            acc[finding.severity] = (acc[finding.severity] || 0) + 1;
+            return acc;
+          }, { P0: 0, P1: 0, P2: 0 });
+
+          const now = new Date().toISOString();
+          const lines = [
+            '# AIPT Organic Growth / SEO Audit',
+            '',
+            `Updated automatically: ${now}`,
+            '',
+            'This issue is maintained by the deep production audit. P0 means live/indexing correctness, P1 means high-impact organic-growth architecture, and P2 means content/UX depth.',
+            '',
+            '## Current signals',
+            ...info.map((item) => `- ${item}`),
+            `- Findings: P0=${counts.P0}, P1=${counts.P1}, P2=${counts.P2}`,
+            '',
+            '## Prioritized findings',
+          ];
+          if (findings.length === 0) lines.push('- No current findings.');
+          for (const finding of findings) {
+            lines.push(`### ${finding.severity} — ${finding.title}`, '', finding.detail, '');
+          }
+          lines.push(
+            '## Automation handoff',
+            '- Fix P0 items before growth experiments.',
+            '- Prefer small reversible PRs with typecheck/tests/build/deploy/live verification.',
+            '- Use original, useful Bangladesh-focused resources rather than thin keyword pages.',
+            '- Do not publish unsupported provider/resale claims or change commercial eligibility without verification.',
+            '- Credit editorial resource pages to **AIPT Admin** where author attribution is displayed.',
+            '',
+          );
+
+          const report = lines.join('\n');
+          fs.writeFileSync('/tmp/aipt-deep-audit.md', report);
+          fs.writeFileSync('/tmp/aipt-deep-audit.json', JSON.stringify({ now, counts, findings, info }, null, 2));
+          console.log(report);
+          console.log(`P0=${counts.P0} P1=${counts.P1} P2=${counts.P2}`);
+          NODE
+
+          node /tmp/aipt-deep-audit.mjs | tee /tmp/aipt-deep-audit.log
+          cat /tmp/aipt-deep-audit.md >> "$GITHUB_STEP_SUMMARY"
+          P0=$(node -e 'const x=require("/tmp/aipt-deep-audit.json");process.stdout.write(String(x.counts.P0))')
+          P1=$(node -e 'const x=require("/tmp/aipt-deep-audit.json");process.stdout.write(String(x.counts.P1))')
+          P2=$(node -e 'const x=require("/tmp/aipt-deep-audit.json");process.stdout.write(String(x.counts.P2))')
+          echo "p0=$P0" >> "$GITHUB_OUTPUT"
+          echo "p1=$P1" >> "$GITHUB_OUTPUT"
+          echo "p2=$P2" >> "$GITHUB_OUTPUT"
+
+      - name: Create or refresh organic-growth audit backlog
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TITLE='[audit] AIPT organic growth and SEO backlog'
+          NUMBER=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"${TITLE}\") | .number" | head -n 1)
+          TOTAL=$(( ${{ steps.audit.outputs.p0 }} + ${{ steps.audit.outputs.p1 }} + ${{ steps.audit.outputs.p2 }} ))
+          if [ "$TOTAL" -gt 0 ]; then
+            if [ -n "$NUMBER" ]; then
+              gh issue edit "$NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/aipt-deep-audit.md
+              echo "Refreshed organic-growth audit backlog #${NUMBER}."
+            else
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file /tmp/aipt-deep-audit.md
+              echo 'Created organic-growth audit backlog.'
+            fi
+          elif [ -n "$NUMBER" ]; then
+            gh issue comment "$NUMBER" --repo "$GITHUB_REPOSITORY" --body 'Automated deep audit found no remaining P0/P1/P2 findings.'
+            gh issue close "$NUMBER" --repo "$GITHUB_REPOSITORY" --comment 'Closing automatically because the deep audit is clean.'
+          fi
+
+      - name: Fail only on P0 correctness problems
+        if: steps.audit.outputs.p0 != '0'
+        shell: bash
+        run: |
+          echo "Deep audit found ${{ steps.audit.outputs.p0 }} P0 correctness issue(s). See the workflow summary and organic-growth audit issue."
+          exit 1
