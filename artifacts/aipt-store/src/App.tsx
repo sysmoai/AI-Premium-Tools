@@ -32,6 +32,7 @@ const AdminLogin = lazy(() => import("@/pages/admin/login"));
 const AdminDashboard = lazy(() => import("@/pages/admin/dashboard"));
 const AdminOrders = lazy(() => import("@/pages/admin/orders"));
 const AdminProducts = lazy(() => import("@/pages/admin/products"));
+const AdminProductMedia = lazy(() => import("@/pages/admin/product-media"));
 const AdminMedia = lazy(() => import("@/pages/admin/media"));
 const AdminCustomers = lazy(() => import("@/pages/admin/customers"));
 
@@ -103,6 +104,9 @@ function AppInner() {
           </Route>
           <Route path="/admin/orders">
             {isAdmin ? <AdminOrders /> : <AdminLogin onLogin={() => setIsAdmin(true)} />}
+          </Route>
+          <Route path="/admin/products/:id/media">
+            {isAdmin ? <AdminProductMedia /> : <AdminLogin onLogin={() => setIsAdmin(true)} />}
           </Route>
           <Route path="/admin/products">
             {isAdmin ? <AdminProducts /> : <AdminLogin onLogin={() => setIsAdmin(true)} />}
