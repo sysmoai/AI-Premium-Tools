@@ -1,0 +1,85 @@
+name: Diagnose AIPT Pages Runtime 500
+
+on:
+  push:
+    branches: [ops/runtime-500-diagnostics]
+    paths:
+      - '.github/workflows/runtime-500-diagnostics.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Compare canonical and Pages deployments
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RAW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          token=$(node -e 'const value=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").replace(/^\uFEFF/,"").trim(); if(!value) process.exit(1); process.stdout.write(value)')
+          account_id=$(node -e 'const value=(process.env.RAW_CLOUDFLARE_ACCOUNT_ID||"").replace(/^\uFEFF/,"").trim(); if(!value) process.exit(1); process.stdout.write(value)')
+
+          api="https://api.cloudflare.com/client/v4/accounts/${account_id}/pages/projects/ai-premium-tools"
+          curl --fail --silent --show-error -H "Authorization: Bearer ${token}" "$api" > /tmp/project.json
+          curl --fail --silent --show-error -H "Authorization: Bearer ${token}" "$api/deployments" > /tmp/deployments.json
+
+          node <<'NODE' > /tmp/targets.env
+          const fs = require('fs');
+          const p = JSON.parse(fs.readFileSync('/tmp/project.json','utf8')).result;
+          const ds = JSON.parse(fs.readFileSync('/tmp/deployments.json','utf8')).result || [];
+          const prod = p?.deployment_configs?.production || {};
+          const safe = {
+            project: p?.name,
+            productionBranch: p?.production_branch,
+            compatibilityDate: prod.compatibility_date || null,
+            compatibilityFlags: prod.compatibility_flags || [],
+            envVarKeys: Object.entries(prod.env_vars || {}).map(([k,v]) => ({ key:k, type:v?.type || 'unknown' })),
+            d1: Object.entries(prod.d1_databases || {}).map(([k,v]) => ({ binding:k, id:v?.id || null })),
+            r2: Object.entries(prod.r2_buckets || {}).map(([k,v]) => ({ binding:k, bucket:v?.name || v?.bucket_name || null })),
+          };
+          console.error(JSON.stringify(safe, null, 2));
+          const current = ds.find(d => d.environment === 'production') || ds[0];
+          const knownGood = ds.find(d => d?.source?.config?.commit_hash === '77fabe227e53dc1bbc42484e3c31d2421ecdb27f');
+          if (!current?.url) throw new Error('No current deployment URL found');
+          console.log(`CURRENT_URL=${current.url}`);
+          if (knownGood?.url) console.log(`KNOWN_GOOD_URL=${knownGood.url}`);
+          console.error(`Current deployment id=${current.id} commit=${current?.source?.config?.commit_hash || 'unknown'} env=${current.environment}`);
+          console.error(`Known-good deployment id=${knownGood?.id || 'not-found'} url=${knownGood?.url || 'not-found'}`);
+          NODE
+          cat /tmp/targets.env >> "$GITHUB_ENV"
+
+          probe() {
+            local base="$1"
+            local label="$2"
+            for path in / /api/healthz /api/products /api/db-schema /checkout; do
+              body=$(mktemp)
+              headers=$(mktemp)
+              code=$(curl --silent --show-error --max-time 15 -D "$headers" -o "$body" -w '%{http_code}' "${base}${path}" || true)
+              ctype=$(grep -i '^content-type:' "$headers" | tail -1 | tr -d '\r' || true)
+              ray=$(grep -i '^cf-ray:' "$headers" | tail -1 | tr -d '\r' || true)
+              printf '%s %s -> HTTP %s | %s | %s\n' "$label" "$path" "$code" "$ctype" "$ray"
+              if [ "$code" != '200' ]; then
+                printf 'body-preview: '
+                head -c 300 "$body" | tr '\n' ' '; echo
+              fi
+              rm -f "$body" "$headers"
+            done
+          }
+
+          echo '--- Canonical ---'
+          probe 'https://aipremium.tools' 'canonical'
+          echo '--- Current pages.dev ---'
+          probe "$CURRENT_URL" 'current-pages'
+          if [ -n "${KNOWN_GOOD_URL:-}" ]; then
+            echo '--- Last-known-good pages.dev ---'
+            probe "$KNOWN_GOOD_URL" 'known-good-pages'
+          fi
+
+          unset token account_id
+          rm -f /tmp/project.json /tmp/deployments.json /tmp/targets.env
