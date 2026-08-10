@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { ArrowLeft, Plus, Pencil, X, Check } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, X, Check, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -143,6 +143,7 @@ export default function AdminProducts() {
           <Link href="/admin"><div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-sidebar-accent/50 cursor-pointer">📊 Dashboard</div></Link>
           <Link href="/admin/orders"><div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-sidebar-accent/50 cursor-pointer">🛒 Orders</div></Link>
           <Link href="/admin/products"><div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium bg-sidebar-accent text-sidebar-accent-foreground cursor-pointer">📦 Products</div></Link>
+          <Link href="/admin/media"><div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-sidebar-accent/50 cursor-pointer">🖼️ Media</div></Link>
           <Link href="/admin/customers"><div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-sidebar-accent/50 cursor-pointer">👥 Customers</div></Link>
         </nav>
         <div className="p-4 border-t border-sidebar-border">
@@ -206,9 +207,16 @@ export default function AdminProducts() {
                           )}
                         </td>
                         <td className="p-4">
-                          <Button variant="ghost" size="sm" onClick={() => openEdit(product)} data-testid={`btn-edit-product-${product.id}`}>
-                            <Pencil className="h-3 w-3 mr-1" /> Edit
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => openEdit(product)} data-testid={`btn-edit-product-${product.id}`}>
+                              <Pencil className="h-3 w-3 mr-1" /> Edit
+                            </Button>
+                            <Link href={`/admin/products/${product.id}/media`}>
+                              <Button variant="ghost" size="sm" data-testid={`btn-media-product-${product.id}`}>
+                                <ImageIcon className="h-3 w-3 mr-1" /> Media
+                              </Button>
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -239,12 +247,12 @@ export default function AdminProducts() {
               <Input value={form.description} onChange={e => updateForm("description", e.target.value)} data-testid="input-product-desc" />
             </div>
             <div className="space-y-1.5">
-              <Label>Logo / Image URL</Label>
+              <Label>Legacy / Primary Image URL</Label>
               <div className="flex gap-2 items-center">
                 <Input
                   value={form.image_url}
                   onChange={e => updateForm("image_url", e.target.value)}
-                  placeholder="/logos/openai.svg"
+                  placeholder="/media/... or /logos/openai.svg"
                   data-testid="input-product-image-url"
                 />
                 {form.image_url && (
@@ -257,7 +265,7 @@ export default function AdminProducts() {
                   />
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">Paste a direct image URL or use clearbit: https://logo.clearbit.com/domain.com</p>
+              <p className="text-xs text-muted-foreground">Existing URLs remain supported. After saving a product, use its Media action to attach R2 images/videos and choose the primary image.</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
