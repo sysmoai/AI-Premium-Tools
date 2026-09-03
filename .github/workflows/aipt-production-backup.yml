@@ -43,14 +43,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Validate backup target and secret presence
+      - name: Validate dedicated backup credentials
         shell: bash
         env:
-          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RAW_CLOUDFLARE_BACKUP_API_TOKEN: ${{ secrets.CLOUDFLARE_BACKUP_API_TOKEN }}
           RAW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
+          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_BACKUP_API_TOKEN||"").trim(); if(!v){console.error("CLOUDFLARE_BACKUP_API_TOKEN is not configured"); process.exit(1)}; process.stdout.write(v)')
           account_id=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_ACCOUNT_ID||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
           if ! [[ "$account_id" =~ ^[0-9a-fA-F]{32}$ ]]; then
             echo 'Invalid Cloudflare account ID format'
