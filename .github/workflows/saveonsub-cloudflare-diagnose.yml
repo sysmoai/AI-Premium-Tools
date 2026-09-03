@@ -1,0 +1,50 @@
+name: SaveOnSub Cloudflare Diagnose
+
+on:
+  push:
+    branches:
+      - ops/saveonsub-cloudflare-diagnose-20260903
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect SaveOnSub Pages routing and latest production deployment
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT_ID: '4ca6269edabb6ad2906d70ec6845de22'
+        run: |
+          set -euo pipefail
+          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${token}" \
+            "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/pages/projects/saveonsub" \
+            > /tmp/project.json
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${token}" \
+            "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/pages/projects/saveonsub/deployments?env=production&per_page=5" \
+            > /tmp/deployments.json
+          node <<'NODE'
+          const project = require('/tmp/project.json');
+          const deployments = require('/tmp/deployments.json');
+          if (!project?.success || project?.result?.name !== 'saveonsub') throw new Error('Project check failed');
+          const p = project.result;
+          console.log('project=' + p.name);
+          console.log('production_branch=' + String(p.production_branch ?? ''));
+          console.log('subdomain=' + String(p.subdomain ?? ''));
+          console.log('domains=' + JSON.stringify(p.domains ?? []));
+          console.log('source_type=' + String(p.source?.type ?? 'none'));
+          const items = Array.isArray(deployments?.result) ? deployments.result : [];
+          console.log('production_deployments=' + items.length);
+          items.slice(0,5).forEach((d,i) => {
+            const md = d?.deployment_trigger?.metadata ?? {};
+            console.log(`deployment_${i+1}=${JSON.stringify({id:d.id,url:d.url,environment:d.environment,created_on:d.created_on,branch:md.branch,commit_hash:md.commit_hash,type:d?.deployment_trigger?.type,aliases:d.aliases})}`);
+          });
+          NODE
+          unset token
+          rm -f /tmp/project.json /tmp/deployments.json
