@@ -100,6 +100,13 @@ function runWrangler(args) {
   }).trim();
 }
 
+function immutableMediaKey(object) {
+  const rawEtag = String(object.etag || "").replace(/^\"|\"$/g, "");
+  const identity = rawEtag || sha256(`${object.key}:${object.size}:${object.last_modified || ""}`);
+  const safeIdentity = identity.replace(/[^A-Za-z0-9._-]/g, "_");
+  return `media/objects/${safeIdentity}/${object.key}`;
+}
+
 try {
   const bucketState = await ensurePrivateBackupBucket();
 
@@ -120,8 +127,8 @@ try {
   const sqlKey = `${prefix}/d1/aipt-db.sql`;
   await putObject(BACKUP_BUCKET, sqlKey, readFileSync(sqlPath), "application/sql; charset=utf-8");
 
-  const mediaObjects = await listObjects(SOURCE_MEDIA_BUCKET);
-  const inventory = mediaObjects
+  const sourceObjects = await listObjects(SOURCE_MEDIA_BUCKET);
+  const inventory = sourceObjects
     .map((o) => ({
       key: String(o.key || ""),
       size: Number(o.size || 0),
@@ -132,25 +139,38 @@ try {
       custom_metadata: o.custom_metadata || null,
     }))
     .filter((o) => o.key)
-    .sort((a, b) => a.key.localeCompare(b.key));
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map((o) => ({ ...o, backup_key: immutableMediaKey(o) }));
 
   const inventoryJson = JSON.stringify(inventory);
   const inventoryHash = sha256(inventoryJson);
   const mediaBytes = inventory.reduce((sum, o) => sum + o.size, 0);
 
-  let copiedMedia = 0;
-  let copiedMediaBytes = 0;
+  const existingMirror = await listObjects(BACKUP_BUCKET, "media/objects/");
+  const existingMirrorKeys = new Set(existingMirror.map((o) => String(o.key || "")));
+  let newMediaObjectsCopied = 0;
+  let newMediaBytesCopied = 0;
+  let reusedMediaObjects = 0;
+
   for (const object of inventory) {
+    if (existingMirrorKeys.has(object.backup_key)) {
+      reusedMediaObjects += 1;
+      continue;
+    }
     const body = await getObject(SOURCE_MEDIA_BUCKET, object.key);
     if (body.byteLength !== object.size) throw new Error("R2 source object size changed during backup; retry capture");
     const contentType = object?.http_metadata?.contentType || object?.http_metadata?.content_type || "application/octet-stream";
-    await putObject(BACKUP_BUCKET, `${prefix}/media/${object.key}`, body, contentType);
-    copiedMedia += 1;
-    copiedMediaBytes += body.byteLength;
+    await putObject(BACKUP_BUCKET, object.backup_key, body, contentType);
+    existingMirrorKeys.add(object.backup_key);
+    newMediaObjectsCopied += 1;
+    newMediaBytesCopied += body.byteLength;
   }
 
+  const missingMirrorRefs = inventory.filter((o) => !existingMirrorKeys.has(o.backup_key));
+  if (missingMirrorRefs.length) throw new Error(`R2 mirror verification failed for ${missingMirrorRefs.length} object(s)`);
+
   const privateManifest = {
-    schema: "aipt-backup-manifest/v1",
+    schema: "aipt-backup-manifest/v2",
     captured_at: capturedAt,
     source_commit: process.env.GITHUB_SHA || null,
     source: {
@@ -159,22 +179,23 @@ try {
     },
     backup: {
       bucket: BACKUP_BUCKET,
-      prefix,
+      snapshot_prefix: prefix,
       d1_sql_key: sqlKey,
       d1_sql_bytes: sqlBytes,
       d1_sql_sha256: sqlHash,
-      media_copy_count: copiedMedia,
-      media_copy_bytes: copiedMediaBytes,
+      media_strategy: "content-addressed-immutable-mirror",
       source_inventory_sha256: inventoryHash,
+      media_objects_verified: inventory.length,
+      new_media_objects_copied: newMediaObjectsCopied,
+      new_media_bytes_copied: newMediaBytesCopied,
+      reused_media_objects: reusedMediaObjects,
     },
   };
   const manifestBytes = Buffer.from(JSON.stringify(privateManifest, null, 2));
   await putObject(BACKUP_BUCKET, `${prefix}/manifest.json`, manifestBytes, "application/json; charset=utf-8");
 
-  const backupObjects = await listObjects(BACKUP_BUCKET, `${prefix}/`);
-  const expectedCount = inventory.length + 2;
-  const actualCount = backupObjects.length;
-  if (actualCount !== expectedCount) throw new Error(`Backup verification object count mismatch: expected ${expectedCount}, got ${actualCount}`);
+  const snapshotObjects = await listObjects(BACKUP_BUCKET, `${prefix}/`);
+  if (snapshotObjects.length !== 2) throw new Error(`Snapshot verification mismatch: expected 2 metadata/data objects, got ${snapshotObjects.length}`);
 
   const safeSummary = {
     status: "ok",
@@ -188,11 +209,13 @@ try {
     source_media_objects: inventory.length,
     source_media_bytes: mediaBytes,
     source_media_inventory_sha256: inventoryHash,
-    copied_media_objects: copiedMedia,
-    copied_media_bytes: copiedMediaBytes,
+    media_objects_verified: inventory.length,
+    new_media_objects_copied: newMediaObjectsCopied,
+    new_media_bytes_copied: newMediaBytesCopied,
+    reused_media_objects: reusedMediaObjects,
     backup_bucket: BACKUP_BUCKET,
     backup_prefix: prefix,
-    backup_objects_verified: actualCount,
+    snapshot_objects_verified: snapshotObjects.length,
     backup_bucket_state: bucketState,
   };
 
