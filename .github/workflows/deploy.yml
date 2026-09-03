@@ -34,6 +34,9 @@ jobs:
           node-version: '24'
           cache: 'pnpm'
 
+      - name: Self-test AIPT-0010 visual redesign freeze
+        run: bash scripts/aipt-design-freeze-guard-selftest.sh
+
       - name: Enforce AIPT-0010 evidence-gated visual redesign freeze
         env:
           AIPT_DIFF_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
