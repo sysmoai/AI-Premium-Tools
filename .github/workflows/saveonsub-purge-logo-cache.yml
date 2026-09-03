@@ -1,0 +1,79 @@
+name: SaveOnSub Purge Logo Cache
+
+on:
+  push:
+    branches:
+      - ops/saveonsub-cloudflare-diagnose-20260903
+
+permissions:
+  contents: read
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Purge only stale SaveOnSub logo URL from Cloudflare edge cache
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT_ID: '4ca6269edabb6ad2906d70ec6845de22'
+        run: |
+          set -euo pipefail
+          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
+          zone_code=$(curl --silent --show-error -o /tmp/zones.json -w "%{http_code}" \
+            --header "Authorization: Bearer ${token}" \
+            "https://api.cloudflare.com/client/v4/zones?name=saveonsub.com&account.id=${ACCOUNT_ID}" || true)
+          if [ "$zone_code" != "200" ]; then
+            echo "Unable to resolve SaveOnSub zone with current credential (HTTP ${zone_code})."
+            exit 1
+          fi
+          zone_id=$(node - <<'NODE'
+          const x=require('/tmp/zones.json');
+          const z=(x.result||[]).find(v=>v.name==='saveonsub.com');
+          if(!x.success || !z?.id) process.exit(2);
+          process.stdout.write(z.id);
+          NODE
+          )
+          purge_code=$(curl --silent --show-error -o /tmp/purge.json -w "%{http_code}" \
+            --request POST \
+            --header "Authorization: Bearer ${token}" \
+            --header 'Content-Type: application/json' \
+            --data '{"files":["https://saveonsub.com/assets/logo.svg"]}' \
+            "https://api.cloudflare.com/client/v4/zones/${zone_id}/purge_cache" || true)
+          if [ "$purge_code" != "200" ]; then
+            echo "Cloudflare cache purge failed (HTTP ${purge_code})."
+            node -e 'const x=require("/tmp/purge.json"); console.log(JSON.stringify({success:x.success,errors:x.errors}))' || true
+            exit 1
+          fi
+          node - <<'NODE'
+          const x=require('/tmp/purge.json');
+          if(!x.success) throw new Error('Cloudflare purge response was not successful');
+          console.log('Purged exactly https://saveonsub.com/assets/logo.svg');
+          NODE
+          unset token
+          rm -f /tmp/zones.json /tmp/purge.json
+
+      - name: Verify apex now serves approved logo bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth=1 --branch=main https://github.com/sysmoai/saveonsub-store.git source >/dev/null 2>&1
+          expected=$(sha256sum source/assets/logo.svg | cut -d' ' -f1)
+          ok=0
+          for attempt in $(seq 1 12); do
+            curl -LsS -D /tmp/logo.h -o /tmp/logo.svg 'https://saveonsub.com/assets/logo.svg'
+            actual=$(sha256sum /tmp/logo.svg | cut -d' ' -f1)
+            if [ "$actual" = "$expected" ]; then
+              ok=1
+              echo "Approved logo live on apex: ${actual}"
+              grep -Ei '^(cache-control|cf-cache-status|age|etag|server|cf-ray):' /tmp/logo.h || true
+              break
+            fi
+            echo "Apex logo not converged yet (${attempt}/12): ${actual}"
+            sleep 5
+          done
+          if [ "$ok" != "1" ]; then
+            echo "Apex logo still differs from approved source after cache purge."
+            exit 1
+          fi
