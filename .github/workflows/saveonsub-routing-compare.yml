@@ -1,0 +1,50 @@
+name: SaveOnSub Routing Compare
+
+on:
+  push:
+    branches:
+      - ops/saveonsub-cloudflare-diagnose-20260903
+
+permissions:
+  contents: read
+
+jobs:
+  compare-routing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Compare Pages deployment, pages.dev and canonical domain
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT_ID: '4ca6269edabb6ad2906d70ec6845de22'
+        run: |
+          set -euo pipefail
+          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
+          curl --fail --silent --show-error --header "Authorization: Bearer ${token}" \
+            "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/pages/projects/saveonsub/domains" > /tmp/domains.json
+          curl --fail --silent --show-error --header "Authorization: Bearer ${token}" \
+            "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/pages/projects/saveonsub/deployments?env=production&per_page=1" > /tmp/deployments.json
+          latest_url=$(node -e 'const x=require("/tmp/deployments.json"); process.stdout.write(x.result?.[0]?.url||"")')
+          if [ -z "$latest_url" ]; then echo "No production deployment URL returned"; exit 1; fi
+          node <<'NODE'
+          const x=require('/tmp/domains.json');
+          if(!x?.success) throw new Error('Domain API failed');
+          for(const d of x.result||[]) console.log('domain=' + JSON.stringify({name:d.name,status:d.status,validation_status:d.validation_data?.status,validation_method:d.validation_data?.method,error:d.validation_data?.error_message||d.error_message||null}));
+          NODE
+          echo "latest_url=${latest_url}"
+          for url in "$latest_url" "https://saveonsub.pages.dev" "https://saveonsub.com" "https://www.saveonsub.com"; do
+            key=$(printf '%s' "$url" | tr -c 'A-Za-z0-9' '_')
+            body="/tmp/${key}.body"
+            hdr="/tmp/${key}.hdr"
+            code=$(curl -LsS -D "$hdr" -o "$body" -w "%{http_code}" "$url/" || true)
+            hash=$(sha256sum "$body" 2>/dev/null | cut -d' ' -f1 || true)
+            marker=no
+            grep -q 'data-brand-lock="2026-08-19-approved"' "$body" 2>/dev/null && marker=yes
+            title=$(grep -o '<title>[^<]*</title>' "$body" 2>/dev/null | head -1 | sed -e 's/<[^>]*>//g' || true)
+            echo "route=${url} http=${code} sha256=${hash} approved_marker=${marker} title=${title}"
+            grep -Ei '^(server|cf-cache-status|cf-ray|age|cache-control|location):' "$hdr" | tr '\n' ' ' || true
+            echo
+          done
+          unset token
+          rm -f /tmp/domains.json /tmp/deployments.json
