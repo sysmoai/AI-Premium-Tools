@@ -1,0 +1,202 @@
+name: SaveOnSub Cloudflare Deployment Broker
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/saveonsub-deploy-broker.yml'
+  schedule:
+    - cron: '*/15 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: saveonsub-cloudflare-deployment-broker
+  cancel-in-progress: false
+
+env:
+  SAVEONSUB_ACCOUNT_ID: '4ca6269edabb6ad2906d70ec6845de22'
+  SAVEONSUB_PROJECT: 'saveonsub'
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Compare SaveOnSub main with Cloudflare production
+        id: detect
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          remote_sha=$(git ls-remote https://github.com/sysmoai/saveonsub-store.git refs/heads/main | awk '{print $1}')
+          if [ -z "$remote_sha" ]; then
+            echo "Unable to resolve SaveOnSub main SHA."
+            exit 1
+          fi
+          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
+          code=$(curl --silent --show-error -o /tmp/project.json -w "%{http_code}" \
+            --header "Authorization: Bearer ${token}" \
+            "https://api.cloudflare.com/client/v4/accounts/${SAVEONSUB_ACCOUNT_ID}/pages/projects/${SAVEONSUB_PROJECT}" || true)
+          if [ "$code" != "200" ]; then
+            echo "Cloudflare SaveOnSub project authorization failed (HTTP ${code})."
+            exit 1
+          fi
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${token}" \
+            "https://api.cloudflare.com/client/v4/accounts/${SAVEONSUB_ACCOUNT_ID}/pages/projects/${SAVEONSUB_PROJECT}/deployments?env=production&per_page=1" \
+            > /tmp/deployments.json
+          current_sha=$(node - <<'NODE'
+          const p=require('/tmp/project.json');
+          const d=require('/tmp/deployments.json');
+          if(!p?.success || p?.result?.name !== 'saveonsub') process.exit(2);
+          process.stdout.write(d?.result?.[0]?.deployment_trigger?.metadata?.commit_hash || '');
+          NODE
+          )
+          echo "remote_sha=${remote_sha}"
+          echo "cloudflare_sha=${current_sha:-none}"
+          echo "remote_sha=${remote_sha}" >> "$GITHUB_OUTPUT"
+          if [ "$current_sha" = "$remote_sha" ]; then
+            echo "needs_deploy=false" >> "$GITHUB_OUTPUT"
+            echo "Cloudflare production already matches SaveOnSub main; no deployment needed."
+          else
+            echo "needs_deploy=true" >> "$GITHUB_OUTPUT"
+            echo "SaveOnSub main differs from Cloudflare production; gated deployment required."
+          fi
+          unset token
+          rm -f /tmp/project.json /tmp/deployments.json
+
+      - name: Fetch exact SaveOnSub main
+        if: steps.detect.outputs.needs_deploy == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth=1 --branch=main https://github.com/sysmoai/saveonsub-store.git saveonsub
+          cd saveonsub
+          actual=$(git rev-parse HEAD)
+          if [ "$actual" != "${{ steps.detect.outputs.remote_sha }}" ]; then
+            echo "SaveOnSub main changed during reconciliation; fail closed and retry on the next run."
+            exit 1
+          fi
+
+      - name: Setup Python
+        if: steps.detect.outputs.needs_deploy == 'true'
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Install build dependencies
+        if: steps.detect.outputs.needs_deploy == 'true'
+        working-directory: saveonsub
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Run truth and stale-price guard
+        if: steps.detect.outputs.needs_deploy == 'true'
+        working-directory: saveonsub
+        run: python check_prices.py
+
+      - name: Run full repository regression audit
+        if: steps.detect.outputs.needs_deploy == 'true'
+        working-directory: saveonsub
+        run: python audit_all.py
+
+      - name: Stage exact public release
+        if: steps.detect.outputs.needs_deploy == 'true'
+        working-directory: saveonsub
+        run: python stage_deploy.py
+
+      - name: Make approved logo cache-safe
+        if: steps.detect.outputs.needs_deploy == 'true'
+        working-directory: saveonsub
+        run: python cache_safe_brand.py
+
+      - name: Verify staged release boundary
+        if: steps.detect.outputs.needs_deploy == 'true'
+        working-directory: saveonsub
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'data-brand-lock="2026-08-19-approved"' _site/index.html
+          grep -q 'data-brand-lock="2026-08-19-approved"' _site/assets/logo.svg
+          grep -q 'data-brand-lock="2026-08-19-approved"' _site/assets/favicon.svg
+          versioned_logo=$(grep -o '/assets/logo-[0-9a-f]\{16\}\.svg' _site/index.html | head -1)
+          test -n "$versioned_logo"
+          test -f "_site${versioned_logo}"
+          grep -q 'data-brand-lock="2026-08-19-approved"' "_site${versioned_logo}"
+          if grep -R -q 'assets/logo\.svg' _site --include='*.html'; then
+            echo "Mutable logo URL remains in staged HTML."
+            exit 1
+          fi
+          test ! -e _site/catalog.json
+          test ! -e _site/build_assets.py
+          test ! -e _site/.env
+          test -f _site/sitemap.xml
+          test -f _site/robots.txt
+
+      - name: Setup Node.js
+        if: steps.detect.outputs.needs_deploy == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Install Wrangler
+        if: steps.detect.outputs.needs_deploy == 'true'
+        run: npm install -g wrangler
+
+      - name: Deploy audited release to SaveOnSub Pages project
+        if: steps.detect.outputs.needs_deploy == 'true'
+        working-directory: saveonsub
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: '4ca6269edabb6ad2906d70ec6845de22'
+        run: |
+          set -euo pipefail
+          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
+          CLOUDFLARE_API_TOKEN="$token" wrangler pages deploy _site \
+            --project-name=saveonsub \
+            --branch=main \
+            --commit-hash="${{ steps.detect.outputs.remote_sha }}"
+          unset token
+
+      - name: Verify canonical live release
+        if: steps.detect.outputs.needs_deploy == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          versioned_logo=$(grep -o '/assets/logo-[0-9a-f]\{16\}\.svg' saveonsub/_site/index.html | head -1)
+          test -n "$versioned_logo"
+          expected_logo_sha=$(sha256sum "saveonsub/_site${versioned_logo}" | cut -d' ' -f1)
+          ok=0
+          for attempt in $(seq 1 48); do
+            home_code=$(curl -LsS -o /tmp/home -w "%{http_code}" https://saveonsub.com/ || true)
+            logo_code=$(curl -LsS -o /tmp/logo -w "%{http_code}" "https://saveonsub.com${versioned_logo}" || true)
+            actual_logo_sha=$(sha256sum /tmp/logo 2>/dev/null | cut -d' ' -f1 || true)
+            if [ "$home_code" = "200" ] && [ "$logo_code" = "200" ] \
+              && grep -q 'data-brand-lock="2026-08-19-approved"' /tmp/home \
+              && grep -Fq "$versioned_logo" /tmp/home \
+              && [ "$actual_logo_sha" = "$expected_logo_sha" ] \
+              && grep -q 'Every plan clearly labeled' /tmp/home \
+              && ! grep -q '100% official, customer-owned on your own account' /tmp/home \
+              && ! grep -q '211+ lifetime orders' /tmp/home; then
+              ok=1
+              break
+            fi
+            sleep 10
+          done
+          if [ "$ok" != "1" ]; then
+            echo "Canonical SaveOnSub did not converge to the approved cache-safe release."
+            exit 1
+          fi
+          for path in catalog.json build_assets.py check_prices.py stage_deploy.py cache_safe_brand.py .env .env.example; do
+            code=$(curl -LsS -o /dev/null -w "%{http_code}" "https://saveonsub.com/${path}" || true)
+            if [ "$code" != "404" ]; then
+              echo "Internal path /${path} is unexpectedly reachable (HTTP ${code})."
+              exit 1
+            fi
+          done
+          echo "Canonical SaveOnSub production verified with immutable approved logo ${versioned_logo}."
