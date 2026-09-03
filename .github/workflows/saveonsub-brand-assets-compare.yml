@@ -1,0 +1,44 @@
+name: SaveOnSub Brand Assets Compare
+
+on:
+  push:
+    branches:
+      - ops/saveonsub-cloudflare-diagnose-20260903
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Build exact staged SaveOnSub brand assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth=1 --branch=main https://github.com/sysmoai/saveonsub-store.git source >/dev/null 2>&1
+          cd source
+          python -m pip install --disable-pip-version-check -r requirements.txt >/dev/null
+          python stage_deploy.py >/dev/null
+      - name: Compare staged assets against apex and www
+        shell: bash
+        run: |
+          set -euo pipefail
+          assets=(logo.svg favicon.svg apple-touch-icon.png icon-192.png icon-512.png og-image.png site.webmanifest)
+          for asset in "${assets[@]}"; do
+            expected=$(sha256sum "source/_site/assets/${asset}" | cut -d' ' -f1)
+            echo "asset=${asset} expected=${expected}"
+            for host in saveonsub.com www.saveonsub.com saveonsub.pages.dev; do
+              body="/tmp/${host//./_}_${asset//\//_}"
+              hdr="${body}.hdr"
+              code=$(curl -LsS -D "$hdr" -o "$body" -w "%{http_code}" "https://${host}/assets/${asset}" || true)
+              actual=$(sha256sum "$body" 2>/dev/null | cut -d' ' -f1 || true)
+              state=mismatch
+              [ "$actual" = "$expected" ] && state=match
+              cache=$(grep -i '^cf-cache-status:' "$hdr" | tail -1 | tr -d '\r' | cut -d: -f2- | xargs || true)
+              age=$(grep -i '^age:' "$hdr" | tail -1 | tr -d '\r' | cut -d: -f2- | xargs || true)
+              cc=$(grep -i '^cache-control:' "$hdr" | tail -1 | tr -d '\r' | cut -d: -f2- | xargs || true)
+              echo "  host=${host} http=${code} actual=${actual} state=${state} cache=${cache:-none} age=${age:-none} cache_control=${cc:-none}"
+            done
+          done
