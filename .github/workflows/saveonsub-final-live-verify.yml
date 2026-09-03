@@ -1,0 +1,44 @@
+name: SaveOnSub Final Live Verify
+
+on:
+  push:
+    branches:
+      - ops/saveonsub-cloudflare-diagnose-20260903
+
+permissions:
+  contents: read
+
+jobs:
+  verify-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify canonical production content, routes, and private-file boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -LsS -D /tmp/home.h -o /tmp/home https://saveonsub.com/
+          curl -LsS -o /tmp/logo https://saveonsub.com/assets/logo.svg
+          grep -q 'data-brand-lock="2026-08-19-approved"' /tmp/home
+          grep -q 'data-brand-lock="2026-08-19-approved"' /tmp/logo
+          grep -q 'Every plan clearly labeled' /tmp/home
+          grep -q 'CHECK ACCESS TYPE' /tmp/home
+          grep -q 'Privacy depends on the exact access method' /tmp/home
+          grep -q 'rel="canonical" href="https://saveonsub.com/"' /tmp/home
+          ! grep -q '100% official, customer-owned on your own account' /tmp/home
+          ! grep -q '211+ lifetime orders' /tmp/home
+          ! grep -q 'The only BD store with honest labels' /tmp/home
+          ! grep -q 'No other BD store offers this' /tmp/home
+          for path in all.html checkout.html p/chatgpt-plus.html bn.html faq.html sitemap.xml robots.txt assets/site.webmanifest; do
+            code=$(curl -LsS -o /dev/null -w "%{http_code}" "https://saveonsub.com/${path}")
+            if [ "$code" != "200" ]; then echo "Expected HTTP 200 for /${path}, got ${code}"; exit 1; fi
+          done
+          for path in catalog.json build_assets.py check_prices.py stage_deploy.py .env .env.example; do
+            code=$(curl -LsS -o /dev/null -w "%{http_code}" "https://saveonsub.com/${path}" || true)
+            if [ "$code" != "404" ]; then echo "Internal path /${path} exposed with HTTP ${code}"; exit 1; fi
+          done
+          curl -LsS -o /tmp/www https://www.saveonsub.com/
+          grep -q 'data-brand-lock="2026-08-19-approved"' /tmp/www
+          grep -q 'rel="canonical" href="https://saveonsub.com/"' /tmp/www
+          echo "FINAL_LIVE_VERIFY=PASS"
+          grep -Ei '^(server|cf-cache-status|cf-ray|cache-control):' /tmp/home.h || true
