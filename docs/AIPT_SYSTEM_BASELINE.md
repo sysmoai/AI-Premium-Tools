@@ -1,5 +1,7 @@
 # AIPT System Baseline
 
+> **Historical snapshot only.** This file records the AIPT state captured on 2026-08-10 and must not be treated as the current operating SSOT. For current authority, roadmap/gates, architecture coordination, and evidence hierarchy, use [`docs/AIPT_MASTER_SYSTEM.md`](./AIPT_MASTER_SYSTEM.md). Where this snapshot conflicts with verified runtime/code/configuration or the master SSOT, the newer verified source wins.
+
 Snapshot date: 2026-08-10 (Asia/Dhaka)
 
 This document is the implementation baseline for AI Premium Tools (AIPT). It is intentionally descriptive: it records current verified architecture and counts before further product, UX, SEO, infrastructure, or growth work.
