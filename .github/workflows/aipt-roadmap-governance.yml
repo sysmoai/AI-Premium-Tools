@@ -1,0 +1,61 @@
+name: AIPT Roadmap Governance
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/aipt-roadmap-governance.yml'
+      - 'scripts/aipt-roadmap-governance.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/aipt-roadmap-governance.yml'
+      - 'scripts/aipt-roadmap-governance.mjs'
+  workflow_dispatch:
+
+concurrency:
+  group: aipt-roadmap-governance
+  cancel-in-progress: false
+
+jobs:
+  validate-plan:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+
+      - name: Validate roadmap governance plan without writes
+        run: node scripts/aipt-roadmap-governance.mjs --check
+
+  apply-governance:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      issues: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+
+      - name: Create or reconcile roadmap milestone, labels, ownership and issue attachments
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/aipt-roadmap-governance.mjs --apply
