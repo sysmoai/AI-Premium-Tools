@@ -1,17 +1,16 @@
 name: AIPT Production Backup
 
 on:
-  pull_request:
-    paths:
-      - '.github/workflows/aipt-production-backup.yml'
-      - 'scripts/aipt-production-backup.mjs'
-      - 'docs/operations/AIPT-0003-DATA-BACKUP-RECOVERY.md'
   workflow_dispatch:
   schedule:
     - cron: '17 21 * * *'
+  workflow_run:
+    workflows: ['Validate and Deploy AIPT']
+    types: [completed]
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: aipt-production-backup
@@ -19,89 +18,85 @@ concurrency:
 
 jobs:
   backup:
-    # Never expose Cloudflare secrets to fork PRs. Same-repository PRs are allowed
-    # so this workflow can be verified before merging; schedule/dispatch run from main.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Validate dedicated backup credentials
+      - name: Request short-lived GitHub OIDC identity
         shell: bash
-        env:
-          RAW_CLOUDFLARE_BACKUP_API_TOKEN: ${{ secrets.CLOUDFLARE_BACKUP_API_TOKEN }}
-          RAW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_BACKUP_API_TOKEN||"").trim(); if(!v){console.error("CLOUDFLARE_BACKUP_API_TOKEN is not configured"); process.exit(1)}; process.stdout.write(v)')
-          account_id=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_ACCOUNT_ID||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
-          if ! [[ "$account_id" =~ ^[0-9a-fA-F]{32}$ ]]; then
-            echo 'Invalid Cloudflare account ID format'
+          response=$(curl --fail --silent --show-error \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=aipt-production-backup")
+          token=$(printf '%s' "$response" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!x.value)process.exit(1);process.stdout.write(x.value)})')
+          echo "::add-mask::$token"
+          printf '%s' "$token" > /tmp/aipt-oidc-token
+          unset token response
+
+      - name: Capture encrypted production backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          token=$(cat /tmp/aipt-oidc-token)
+          code=$(curl --silent --show-error \
+            --connect-timeout 10 --max-time 1500 \
+            --request POST \
+            --header "Authorization: Bearer ${token}" \
+            --header 'Accept: application/json' \
+            --output /tmp/aipt-backup-summary.json \
+            --write-out '%{http_code}' \
+            'https://aipremium.tools/internal/aipt-backup')
+          if [ "$code" != '200' ]; then
+            echo "Backup endpoint returned HTTP ${code}" >&2
+            node -e 'const fs=require("fs");try{const x=JSON.parse(fs.readFileSync("/tmp/aipt-backup-summary.json","utf8"));console.error(x?.error||"Backup failed")}catch{}'
             exit 1
           fi
-          echo "::add-mask::$token"
-          echo "CLOUDFLARE_API_TOKEN=$token" >> "$GITHUB_ENV"
-          echo "CLOUDFLARE_ACCOUNT_ID=$account_id" >> "$GITHUB_ENV"
-          unset token account_id
-
-      - name: Capture and verify private production backup
-        shell: bash
-        env:
-          AIPT_BACKUP_SAFE_SUMMARY: /tmp/aipt-backup-safe-summary.json
-        run: |
-          set -euo pipefail
-          node scripts/aipt-production-backup.mjs > /tmp/aipt-backup-console.json
-          test -s /tmp/aipt-backup-safe-summary.json
           node <<'NODE'
           const fs = require('fs');
-          const x = JSON.parse(fs.readFileSync('/tmp/aipt-backup-safe-summary.json', 'utf8'));
-          if (x.status !== 'ok') throw new Error('Backup did not report status=ok');
-          if (x.source_db !== 'aipt-db' || x.source_db_version !== 'production') throw new Error('Unexpected D1 backup source');
-          if (!x.d1_time_travel_bookmark_captured || !x.d1_export_sha256) throw new Error('D1 recovery evidence incomplete');
-          if (x.source_media_objects !== x.media_objects_verified) throw new Error('R2 mirror verification count mismatch');
-          if (x.new_media_objects_copied + x.reused_media_objects !== x.source_media_objects) throw new Error('R2 deduplication accounting mismatch');
-          if (x.snapshot_objects_verified !== 2) throw new Error('Snapshot metadata/data verification mismatch');
+          const x = JSON.parse(fs.readFileSync('/tmp/aipt-backup-summary.json', 'utf8'));
+          if (x.status !== 'ok' || x.verified !== true) throw new Error('Backup did not report verified status=ok');
+          if (!x.snapshot_id || !x.encryption_key_fingerprint) throw new Error('Backup identity evidence incomplete');
+          if (!x.database || x.database.tables < 1 || x.database.rows < 1 || !x.database.plaintext_sha256) throw new Error('Database backup evidence incomplete');
+          if (!x.media || x.media.source_objects < 0) throw new Error('Media backup evidence incomplete');
+          if (x.media.new_copies + x.media.reused_copies !== x.media.source_objects) throw new Error('Media backup accounting mismatch');
+          if (!x.manifest_plaintext_sha256) throw new Error('Manifest verification evidence incomplete');
           const lines = [
             '# AIPT production backup',
             '',
-            `- Status: **${x.status.toUpperCase()}**`,
+            `- Status: **${x.status.toUpperCase()} / VERIFIED**`,
             `- Captured: ${x.captured_at}`,
-            `- D1 backend: ${x.source_db_version}`,
-            `- D1 Time Travel bookmark captured: yes (hash ${x.d1_time_travel_bookmark_sha256_12})`,
-            `- D1 export: ${x.d1_export_bytes} bytes`,
-            `- D1 SHA-256: \`${x.d1_export_sha256}\``,
-            `- Source R2 media: ${x.source_media_objects} objects / ${x.source_media_bytes} bytes`,
-            `- R2 mirror verified: ${x.media_objects_verified} objects`,
-            `- New media copied this run: ${x.new_media_objects_copied} objects / ${x.new_media_bytes_copied} bytes`,
-            `- Existing immutable media reused: ${x.reused_media_objects} objects`,
-            `- Inventory SHA-256: \`${x.source_media_inventory_sha256}\``,
-            `- Private backup bucket: \`${x.backup_bucket}\``,
-            `- Private snapshot prefix: \`${x.backup_prefix}\``,
+            `- Snapshot ID: \`${x.snapshot_id}\``,
+            `- Recovery public-key fingerprint: \`${x.encryption_key_fingerprint}\``,
+            `- D1 logical snapshot: ${x.database.tables} table(s), ${x.database.rows} row(s)`,
+            `- D1 plaintext bytes before encryption: ${x.database.plaintext_bytes}`,
+            `- D1 plaintext SHA-256: \`${x.database.plaintext_sha256}\``,
+            `- R2 source media: ${x.media.source_objects} object(s) / ${x.media.source_bytes} bytes`,
+            `- New encrypted media copies: ${x.media.new_copies}`,
+            `- Existing encrypted media reused: ${x.media.reused_copies}`,
+            `- Private manifest SHA-256: \`${x.manifest_plaintext_sha256}\``,
             '',
-            '> The SQL dump, full Time Travel bookmark, object keys, and private manifest are intentionally NOT uploaded as GitHub artifacts or printed to logs.',
+            '> Backup payloads and original object keys are encrypted. No plaintext database rows, customer data, payment data, or media keys are uploaded to GitHub artifacts.',
           ];
           fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
+          fs.writeFileSync('/tmp/aipt-snapshot-id', x.snapshot_id);
           NODE
 
-      - name: Remove local backup traces
-        if: always()
+      - name: Verify backup namespace is not publicly downloadable
         shell: bash
         run: |
-          rm -f /tmp/aipt-backup-safe-summary.json /tmp/aipt-backup-console.json
+          set -euo pipefail
+          snapshot=$(cat /tmp/aipt-snapshot-id)
+          code=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            "https://aipremium.tools/media/_aipt-backups/${snapshot}/manifest.json.enc")
+          if [ "$code" != '404' ]; then
+            echo "Encrypted backup namespace must return 404 publicly; got HTTP ${code}" >&2
+            exit 1
+          fi
+          echo 'Reserved backup media namespace correctly returns 404.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove local authentication and summary traces
+        if: always()
+        shell: bash
+        run: rm -f /tmp/aipt-oidc-token /tmp/aipt-backup-summary.json /tmp/aipt-snapshot-id
