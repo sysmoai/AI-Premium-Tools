@@ -34,6 +34,9 @@ jobs:
           node-version: '24'
           cache: 'pnpm'
 
+      - name: Enforce AIPT repository/business-unit isolation
+        run: node scripts/aipt-repository-isolation-guard.mjs
+
       - name: Self-test AIPT-0010 visual redesign freeze
         run: bash scripts/aipt-design-freeze-guard-selftest.sh
 
