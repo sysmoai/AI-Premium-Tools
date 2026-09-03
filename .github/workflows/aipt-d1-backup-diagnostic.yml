@@ -1,0 +1,113 @@
+name: AIPT D1 Backup Diagnostic
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/aipt-d1-backup-diagnostic.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  d1-read-export:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate existing deploy credentials
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RAW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
+          account_id=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_ACCOUNT_ID||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
+          if ! [[ "$account_id" =~ ^[0-9a-fA-F]{32}$ ]]; then
+            echo 'Invalid Cloudflare account ID format'
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "CLOUDFLARE_API_TOKEN=$token" >> "$GITHUB_ENV"
+          echo "CLOUDFLARE_ACCOUNT_ID=$account_id" >> "$GITHUB_ENV"
+          unset token account_id
+
+      - name: Verify D1 identity and Time Travel
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler d1 info aipt-db --json > /tmp/d1-info.json
+          pnpm exec wrangler d1 time-travel info aipt-db --json > /tmp/d1-tt.json
+          node <<'NODE'
+          const fs = require('fs');
+          const infoRaw = JSON.parse(fs.readFileSync('/tmp/d1-info.json','utf8'));
+          const info = Array.isArray(infoRaw) ? infoRaw[0] : infoRaw;
+          const id = String(info?.uuid || info?.id || '');
+          if (id !== '9c19dfdb-aead-4bed-b6ff-f6bf379bc296') throw new Error('D1 ID mismatch');
+          const ttRaw = JSON.parse(fs.readFileSync('/tmp/d1-tt.json','utf8'));
+          const tt = Array.isArray(ttRaw) ? ttRaw[0] : ttRaw;
+          const bookmark = String(tt?.bookmark || tt?.current_bookmark || '');
+          if (!bookmark) throw new Error('No Time Travel bookmark');
+          console.log(`D1 identity verified; backend=${String(info?.version || 'unknown')}; Time Travel bookmark present=yes`);
+          NODE
+
+      - name: Export full D1 snapshot read-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler d1 export aipt-db --remote --output=/tmp/aipt-db.sql --skip-confirmation
+          test -s /tmp/aipt-db.sql
+          bytes=$(wc -c < /tmp/aipt-db.sql | tr -d ' ')
+          hash=$(sha256sum /tmp/aipt-db.sql | awk '{print $1}')
+          if [ "$bytes" -lt 100 ]; then
+            echo 'D1 export unexpectedly small'
+            exit 1
+          fi
+          echo "D1 export verified: ${bytes} bytes; sha256=${hash}"
+          {
+            echo '# AIPT D1 diagnostic'
+            echo
+            echo '- Existing deploy token can read production D1: yes'
+            echo '- Time Travel metadata accessible: yes'
+            echo "- Full SQL export bytes: ${bytes}"
+            echo "- SQL SHA-256: \`${hash}\`"
+            echo '- SQL file intentionally deleted and not uploaded as an artifact.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify media registry count read-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler d1 execute aipt-db --remote --command='SELECT COUNT(*) AS media_asset_count FROM media_assets;' --json > /tmp/media-count.json
+          node <<'NODE'
+          const fs=require('fs');
+          const x=JSON.parse(fs.readFileSync('/tmp/media-count.json','utf8'));
+          const rows = Array.isArray(x) ? (x[0]?.results || x[0]?.result || []) : (x?.results || x?.result || []);
+          const row = Array.isArray(rows) ? rows[0] : null;
+          const n = Number(row?.media_asset_count ?? 0);
+          if (!Number.isFinite(n) || n < 0) throw new Error('Could not read media registry count');
+          console.log(`D1 media_assets registry count=${n}`);
+          NODE
+
+      - name: Remove sensitive local traces
+        if: always()
+        shell: bash
+        run: rm -f /tmp/aipt-db.sql /tmp/d1-info.json /tmp/d1-tt.json /tmp/media-count.json
