@@ -1,0 +1,34 @@
+name: SaveOnSub Logo Compare
+
+on:
+  push:
+    branches:
+      - ops/saveonsub-cloudflare-diagnose-20260903
+
+permissions:
+  contents: read
+
+jobs:
+  compare-logo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Compare source and live logo bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth=1 --branch=main https://github.com/sysmoai/saveonsub-store.git source >/dev/null 2>&1
+          echo "source_sha=$(sha256sum source/assets/logo.svg | cut -d' ' -f1)"
+          if grep -Fq 'data-brand-lock="2026-08-19-approved"' source/assets/logo.svg; then echo "source_marker=yes"; else echo "source_marker=no"; fi
+          latest_url=$(curl -LsS https://api.github.com/repos/sysmoai/saveonsub-store/commits/main >/dev/null 2>&1; printf '%s' 'https://35ed8e25.saveonsub.pages.dev')
+          for url in "$latest_url/assets/logo.svg" "https://saveonsub.pages.dev/assets/logo.svg" "https://saveonsub.com/assets/logo.svg" "https://www.saveonsub.com/assets/logo.svg"; do
+            body=/tmp/logo.$RANDOM
+            hdr=${body}.hdr
+            code=$(curl -LsS -D "$hdr" -o "$body" -w "%{http_code}" "$url" || true)
+            sha=$(sha256sum "$body" | cut -d' ' -f1)
+            marker=no
+            grep -Fq 'data-brand-lock="2026-08-19-approved"' "$body" && marker=yes
+            echo "logo=${url} http=${code} sha=${sha} marker=${marker} bytes=$(wc -c < "$body")"
+            grep -Ei '^(cache-control|cf-cache-status|age|etag|last-modified|server|cf-ray):' "$hdr" | tr '\n' ' ' || true
+            echo
+          done
