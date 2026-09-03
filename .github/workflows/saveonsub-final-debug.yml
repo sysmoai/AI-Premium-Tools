@@ -1,0 +1,53 @@
+name: SaveOnSub Final Debug
+
+on:
+  push:
+    branches:
+      - ops/saveonsub-cloudflare-diagnose-20260903
+
+permissions:
+  contents: read
+
+jobs:
+  debug-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Print each live verification assertion
+        shell: bash
+        run: |
+          set -u
+          failures=0
+          curl -LsS -D /tmp/home.h -o /tmp/home https://saveonsub.com/
+          curl -LsS -o /tmp/logo https://saveonsub.com/assets/logo.svg
+          check_present() {
+            label="$1"; needle="$2"; file="$3"
+            if grep -Fq "$needle" "$file"; then echo "PASS present: $label"; else echo "FAIL missing: $label"; failures=$((failures+1)); fi
+          }
+          check_absent() {
+            label="$1"; needle="$2"; file="$3"
+            if grep -Fq "$needle" "$file"; then echo "FAIL forbidden present: $label"; failures=$((failures+1)); else echo "PASS absent: $label"; fi
+          }
+          check_present brand-home 'data-brand-lock="2026-08-19-approved"' /tmp/home
+          check_present brand-logo 'data-brand-lock="2026-08-19-approved"' /tmp/logo
+          check_present labels 'Every plan clearly labeled' /tmp/home
+          check_present access-type 'CHECK ACCESS TYPE' /tmp/home
+          check_present privacy-copy 'Privacy depends on the exact access method' /tmp/home
+          check_present canonical 'rel="canonical" href="https://saveonsub.com/"' /tmp/home
+          check_absent old-official '100% official, customer-owned on your own account' /tmp/home
+          check_absent old-orders '211+ lifetime orders' /tmp/home
+          check_absent old-only-store 'The only BD store with honest labels' /tmp/home
+          check_absent old-exclusive 'No other BD store offers this' /tmp/home
+          for path in all.html checkout.html p/chatgpt-plus.html bn.html faq.html sitemap.xml robots.txt assets/site.webmanifest; do
+            code=$(curl -LsS -o /dev/null -w "%{http_code}" "https://saveonsub.com/${path}" || true)
+            if [ "$code" = "200" ]; then echo "PASS route /${path}=200"; else echo "FAIL route /${path}=${code}"; failures=$((failures+1)); fi
+          done
+          for path in catalog.json build_assets.py check_prices.py stage_deploy.py .env .env.example; do
+            code=$(curl -LsS -o /dev/null -w "%{http_code}" "https://saveonsub.com/${path}" || true)
+            if [ "$code" = "404" ]; then echo "PASS private /${path}=404"; else echo "FAIL private /${path}=${code}"; failures=$((failures+1)); fi
+          done
+          curl -LsS -o /tmp/www https://www.saveonsub.com/
+          check_present www-brand 'data-brand-lock="2026-08-19-approved"' /tmp/www
+          check_present www-canonical 'rel="canonical" href="https://saveonsub.com/"' /tmp/www
+          echo "failures=${failures}"
+          exit "$failures"
