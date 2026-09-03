@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/hourly-code-quality-watch.yml'
+      - '.gitignore'
 
 permissions:
   contents: read
@@ -23,15 +24,17 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 9
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
           cache: 'pnpm'
@@ -87,12 +90,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bad=$(git ls-files | grep -E '(^|/)(\.env|\.env\.local|\.env\.production|wrangler\.toml\.secret)$' || true)
-          if [ -n "$bad" ]; then
-            printf 'Tracked sensitive environment file(s):\n%s\n' "$bad"
+
+          # Secret-bearing local configuration must never be tracked. Keep the
+          # documented .env.example template allowed.
+          bad_files=$(git ls-files | grep -E '(^|/)(\.env($|\.)|\.dev\.vars($|\.)|wrangler\.toml\.secret$)' | grep -v -E '(^|/)\.env\.example$' || true)
+          if [ -n "$bad_files" ]; then
+            printf 'Tracked sensitive environment/config file(s):\n%s\n' "$bad_files"
             exit 1
           fi
-          echo 'No forbidden environment files are tracked.'
+
+          # Fail on unmistakable private-key blocks or common live-token
+          # prefixes in the current tracked tree. This supplements GitHub's
+          # platform scanning; it does not claim to prove historical rotation.
+          if git grep -I -n -E -- '-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|sk_live_[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}' -- .; then
+            echo 'Potential live secret/private key detected in tracked content.'
+            exit 1
+          fi
+
+          echo 'No forbidden secret files or high-confidence credential patterns are tracked.'
 
       - name: Report, reconcile incident and enforce quality gates
         if: always()
