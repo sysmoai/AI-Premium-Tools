@@ -21,6 +21,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
@@ -32,6 +33,12 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
+
+      - name: Enforce AIPT-0010 evidence-gated visual redesign freeze
+        env:
+          AIPT_DIFF_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          AIPT_DIFF_HEAD: ${{ github.sha }}
+        run: node scripts/aipt-design-freeze-guard.mjs
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
