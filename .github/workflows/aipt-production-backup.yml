@@ -81,6 +81,7 @@ jobs:
           ];
           fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
           fs.writeFileSync('/tmp/aipt-snapshot-id', x.snapshot_id);
+          fs.appendFileSync(process.env.GITHUB_ENV, `AIPT_SNAPSHOT_ID=${x.snapshot_id}\n`);
           NODE
 
       - name: Verify backup namespace is not publicly downloadable
@@ -96,7 +97,88 @@ jobs:
           fi
           echo 'Reserved backup media namespace correctly returns 404.' >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Remove local authentication and summary traces
+      - name: Export encrypted backup corpus for off-provider copy
+        shell: bash
+        run: |
+          set -euo pipefail
+          token=$(cat /tmp/aipt-oidc-token)
+          mkdir -p /tmp/aipt-offsite/objects
+          code=$(curl --silent --show-error \
+            --connect-timeout 10 --max-time 120 \
+            --request POST \
+            --header "Authorization: Bearer ${token}" \
+            --header 'Accept: application/json' \
+            --output /tmp/aipt-offsite/export-index.json \
+            --write-out '%{http_code}' \
+            'https://aipremium.tools/internal/aipt-backup-export?mode=index')
+          test "$code" = '200'
+
+          node <<'NODE'
+          const fs = require('fs');
+          const x = JSON.parse(fs.readFileSync('/tmp/aipt-offsite/export-index.json', 'utf8'));
+          if (x.status !== 'ok' || x.encrypted_only !== true) throw new Error('Encrypted export index invalid');
+          if (!Array.isArray(x.objects) || x.objects.length < 2) throw new Error('Encrypted export inventory unexpectedly small');
+          const mapping = x.objects.map((o, i) => ({
+            local_file: `objects/${String(i + 1).padStart(6, '0')}.enc`,
+            backup_key: o.key,
+            size: o.size,
+            etag: o.etag,
+            uploaded: o.uploaded,
+          }));
+          fs.writeFileSync('/tmp/aipt-offsite/restore-index.json', JSON.stringify({
+            format: 'aipt-offsite-encrypted-v1',
+            encrypted_only: true,
+            generated_at: new Date().toISOString(),
+            object_count: mapping.length,
+            total_bytes: x.total_bytes,
+            objects: mapping,
+          }, null, 2));
+          fs.writeFileSync('/tmp/aipt-offsite/download.tsv', mapping.map((o) => [
+            Buffer.from(o.backup_key).toString('base64'),
+            o.local_file,
+            o.size,
+          ].join('\t')).join('\n') + '\n');
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `- Encrypted offsite inventory: ${mapping.length} object(s) / ${x.total_bytes} bytes\n`);
+          NODE
+
+          while IFS=$'\t' read -r key_b64 local_file expected_size; do
+            [ -n "$key_b64" ] || continue
+            key=$(printf '%s' "$key_b64" | base64 --decode)
+            encoded=$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$key")
+            dest="/tmp/aipt-offsite/${local_file}"
+            code=$(curl --silent --show-error \
+              --connect-timeout 10 --max-time 900 \
+              --request POST \
+              --header "Authorization: Bearer ${token}" \
+              --output "$dest" \
+              --write-out '%{http_code}' \
+              "https://aipremium.tools/internal/aipt-backup-export?mode=download&key=${encoded}")
+            test "$code" = '200'
+            actual_size=$(stat -c%s "$dest")
+            test "$actual_size" = "$expected_size"
+            unset key encoded dest actual_size
+          done < /tmp/aipt-offsite/download.tsv
+
+          rm -f /tmp/aipt-offsite/download.tsv
+          (cd /tmp/aipt-offsite && sha256sum objects/*.enc > SHA256SUMS)
+          node <<'NODE'
+          const fs = require('fs');
+          const index = JSON.parse(fs.readFileSync('/tmp/aipt-offsite/restore-index.json', 'utf8'));
+          const checks = fs.readFileSync('/tmp/aipt-offsite/SHA256SUMS', 'utf8').trim().split('\n').filter(Boolean);
+          if (checks.length !== index.object_count) throw new Error('Offsite checksum count mismatch');
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '- Encrypted offsite object download + SHA-256 verification: PASS\n');
+          NODE
+
+      - name: Upload short-retention encrypted offsite artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aipt-offsite-encrypted-${{ env.AIPT_SNAPSHOT_ID }}
+          path: /tmp/aipt-offsite
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+      - name: Remove local authentication and backup traces
         if: always()
         shell: bash
-        run: rm -f /tmp/aipt-oidc-token /tmp/aipt-backup-summary.json /tmp/aipt-snapshot-id
+        run: rm -rf /tmp/aipt-oidc-token /tmp/aipt-backup-summary.json /tmp/aipt-snapshot-id /tmp/aipt-offsite
