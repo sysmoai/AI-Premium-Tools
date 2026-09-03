@@ -1,243 +1,201 @@
 # AIPT-0003 — Production Data Backup & Recovery Baseline
 
-Status: BLOCKED — implementation ready; dedicated backup token required for real verification  
+Status: IMPLEMENTED — real production verification required before completion  
 Created: 2026-09-03 (Asia/Dhaka)  
 Canonical production: https://aipremium.tools  
 Source rollback anchor: `rollback/aipt-production-baseline-2026-09-03`  
 Source baseline SHA: `28da818cd1682cd617d4420bb98925a502dbe759`
 
-## 1. Objective
+## Objective
 
-Protect the production data that Git source rollback cannot restore:
+Protect production state that Git source rollback cannot restore, without placing customer/order data, provider credentials, plaintext database rows or private recovery material in the public GitHub repository.
 
-- Cloudflare D1 database `aipt-db`
-- Cloudflare R2 media bucket `aipt-media`
-- the exact D1 point-in-time recovery bookmark associated with each backup run
-- a private manifest that maps production R2 objects to immutable backup objects
+Covered sources:
 
-A backup is not considered valid merely because a command returned zero. The backup runner verifies source identity, D1 backend type, SQL export size/hash, R2 inventory completeness, immutable media mirror references, and snapshot object presence.
+- Cloudflare D1 production binding `DB` / database `aipt-db`
+- Cloudflare R2 production binding `MEDIA` / bucket `aipt-media`
+- D1 schema definitions and all user-table rows
+- every R2 object outside the reserved backup namespace
 
-## 2. Non-negotiable privacy rule
+## Final architecture
 
-The GitHub repository is PUBLIC. Production SQL contains customer/order data and may include personal data such as names, phone numbers, email addresses, payment references, notes, reviews, and operational records.
+AIPT-0003 does **not** require a broad Cloudflare management API token.
 
-Therefore:
+GitHub Actions obtains a short-lived signed OIDC token from GitHub and POSTs it to:
 
-- NEVER upload a D1 dump to a GitHub Actions artifact.
-- NEVER commit a D1 dump to Git.
-- NEVER print SQL, customer rows, payment references, full R2 object keys, or the full Time Travel bookmark into public logs.
-- NEVER put the private backup manifest in the repository.
-- Store production backup payloads only in the private Cloudflare R2 backup bucket `aipt-backups`.
+`https://aipremium.tools/internal/aipt-backup`
 
-GitHub may contain only non-sensitive verification summaries and hashes.
+The Cloudflare Pages Function verifies the GitHub JWT signature and exact identity claims before doing any work. After authentication it reads production data only through the Pages Function's existing `DB` and `MEDIA` bindings.
 
-## 3. Current production data sources
+The backup endpoint never exposes plaintext backup content to GitHub Actions. It encrypts payloads inside Cloudflare before writing them to R2.
 
-### D1
+## Authentication controls
 
-- Name: `aipt-db`
-- ID: `9c19dfdb-aead-4bed-b6ff-f6bf379bc296`
-- Expected migration: `0002_catalog_media_foundation.sql`
-- Production application binding: `DB`
+The endpoint requires:
 
-The backup runner refuses to continue if the returned D1 identity differs from the expected database ID or if the D1 backend is not reported as `production`.
+- issuer: `https://token.actions.githubusercontent.com`
+- audience: `aipt-production-backup`
+- repository: `sysmoai/AI-Premium-Tools`
+- immutable repository ID: `1239441399`
+- workflow identity: `.github/workflows/aipt-production-backup.yml`
+- accepted production ref: `refs/heads/main`
+- accepted production events: `schedule`, `workflow_dispatch`, `workflow_run`
 
-### R2 media
+JWT signatures are verified against GitHub's live OIDC JWKS using RS256.
 
-- Production bucket: `aipt-media`
-- Application binding: `MEDIA`
-- Public delivery path: `https://aipremium.tools/media/<key>` through Pages Functions
+Pull-request refs are accepted only for controlled same-repository verification of the endpoint logic; production scheduled backups run from `main`.
 
-The backup system does not change or rewrite any object in `aipt-media`.
+## Encryption
 
-### Backup destination
+AIPT uses envelope encryption for every sensitive payload:
 
-- Bucket: `aipt-backups`
-- Must remain private.
-- Must NOT be attached to a public custom domain.
-- Must NOT have an `r2.dev` public endpoint enabled.
-- Must NOT be bound to the production storefront unless a future recovery design explicitly requires it.
+1. Generate a fresh AES-256-GCM key.
+2. Generate a random 12-byte IV.
+3. Encrypt the payload with AES-GCM.
+4. Wrap the AES key with the AIPT RSA-4096 recovery public key using RSA-OAEP SHA-256.
+5. Store only the encrypted envelope in R2.
 
-R2 buckets are private by default; this document treats any future public exposure of `aipt-backups` as a security incident.
+Recovery public-key fingerprint:
 
-## 4. Backup model
+`8b34ab2a3e75e7adcbf3801a8c7fdda3d599d7e2b7737b83da62893139a31598`
 
-### 4.1 D1 — two recovery layers
+The private key is **not** in Git, GitHub Actions secrets, Cloudflare configuration or application code. It is held in the owner's connected Google Drive recovery vault:
 
-Layer A — Cloudflare D1 Time Travel:
+`AIPT Recovery Vault — Backup Private Key — 2026-09-03`
 
-- Cloudflare provides built-in point-in-time recovery for D1 production storage.
-- The runner captures the current Time Travel bookmark on each successful backup.
-- The complete bookmark is stored only in the private manifest.
-- Public logs contain only a short SHA-256 fingerprint of the bookmark.
+Never copy that private key into a GitHub issue, PR, Cloudflare variable, chat, support ticket or public document.
 
-Layer B — full SQL export:
+## D1 backup format
 
-- `wrangler d1 export aipt-db --remote` produces a full schema + data SQL snapshot.
-- The SQL file is uploaded directly to private R2 under `snapshots/<timestamp>/d1/aipt-db.sql`.
-- SHA-256 and byte size are recorded.
-- The temporary runner copy is deleted after the job.
+Current AIPT production cannot rely on `D1Database.dump()` as a universal backup primitive. AIPT therefore creates a portable logical snapshot from the runtime binding.
 
-The SQL export provides a recovery source beyond the useful Time Travel window and a portable database-level recovery artifact.
+The encrypted database payload contains:
 
-## 5. R2 media backup model
+- `sqlite_master` schema definitions
+- every non-internal user table
+- all rows for every captured table
+- per-table row counts
+- total row count
+- capture timestamp
 
-Repeatedly copying the entire media bucket every day would multiply storage unnecessarily. AIPT therefore uses an immutable content-addressed mirror.
+The plaintext JSON is SHA-256 hashed before encryption. The hash and non-sensitive counts are returned in the workflow summary; the rows themselves never leave the encrypted backup payload.
 
-For every production R2 object:
+The endpoint fails closed if the database snapshot exceeds configured row/byte safety limits rather than silently producing a partial backup.
 
-1. Capture key, size, ETag, last-modified time, storage class, HTTP metadata, and custom metadata into the private snapshot manifest.
-2. Derive an immutable backup key from the object ETag/content identity.
-3. If that exact immutable backup object already exists, reuse it.
-4. If it does not exist, download the production object and copy it once into `aipt-backups`.
-5. Verify that every source object in the snapshot has a corresponding backup reference.
+## D1 Time Travel
 
-Immutable media objects live below `media/objects/<content-identity>/<original-key>`.
+Cloudflare D1 Time Travel remains an additional recovery layer supplied by Cloudflare. AIPT-0003 does not falsely claim to capture a Time Travel bookmark because the runtime D1 binding does not expose that management-plane operation and the existing deployment token is intentionally not broadened.
 
-This means unchanged media is stored once even though many daily manifests can reference it.
+For a recent incident, operators may use Cloudflare's D1 Time Travel from the authorized Cloudflare control plane. For durable recovery outside that window, use the encrypted logical snapshots described here.
 
-## 6. Snapshot manifest
+## R2 media backup
 
-Each successful run creates a PRIVATE manifest at `snapshots/<timestamp>/manifest.json` containing:
+The endpoint enumerates the full `MEDIA` bucket while excluding the reserved prefix:
 
-- capture time
-- source commit
-- D1 name / ID / storage version
-- full Time Travel bookmark
-- D1 export key, size and SHA-256
-- complete R2 source inventory
-- R2 HTTP/custom metadata
-- immutable backup key for each R2 source object
-- R2 inventory SHA-256
-- deduplication/copy verification counts
+`_aipt-backups/`
 
-The manifest is the recovery map. It must remain private with the SQL snapshot.
+Each source object receives an immutable source identity derived from its key, ETag and size. Its encrypted backup is stored under a content-addressed key:
 
-## 7. Automation cadence
+`_aipt-backups/media/<source-identity>.enc`
+
+If that encrypted object already exists, later snapshots reuse it. Unchanged media is therefore not recopied every day.
+
+The private encrypted manifest records the original object key, byte size, ETag, upload time, HTTP metadata, custom metadata, backup key and source identity required for restoration.
+
+## Snapshot structure
+
+Each backup creates:
+
+`_aipt-backups/<timestamp>/database.json.enc`  
+`_aipt-backups/<timestamp>/manifest.json.enc`
+
+Reusable encrypted media objects live below:
+
+`_aipt-backups/media/<source-identity>.enc`
+
+The manifest itself is encrypted and contains the recovery map.
+
+## Public-access firewall
+
+`functions/media/[[key]].ts` explicitly returns HTTP 404 for every R2 key beginning with `_aipt-backups/`.
+
+This gives two independent controls:
+
+1. backup payloads are strongly encrypted;
+2. the normal public media delivery route refuses to serve the backup namespace.
+
+## Automation cadence
 
 Workflow: `.github/workflows/aipt-production-backup.yml`
 
-Planned schedule after merge to the default branch:
+Triggers:
 
-- Every day at 21:17 UTC
-- Equivalent to approximately 03:17 Asia/Dhaka the following calendar day
-- Manual `workflow_dispatch` remains available for pre-change and incident backups
+- after a successful `Validate and Deploy AIPT` workflow
+- every day at 21:17 UTC
+- explicit `workflow_dispatch`
 
-A backup should also run immediately before any high-risk production action such as D1 migration, bulk catalog/customer/order changes, destructive admin actions, media replacement/deletion, or emergency restoration.
+The job requests a short-lived GitHub OIDC token and calls the production backup endpoint. No long-lived Cloudflare backup token is used.
 
-## 8. Retention
+## Workflow acceptance checks
 
-Initial policy: NO automatic backup deletion.
+A backup run must prove all of the following:
 
-Reason: the system is being established for the first time, and deleting recovery points before a full recovery drill would create unnecessary risk. D1 SQL snapshots are expected to be comparatively small, while R2 media is deduplicated by immutable content identity.
+- endpoint authenticated the GitHub OIDC identity
+- encrypted D1 snapshot exists and is re-read with matching byte size
+- D1 snapshot has at least one table and row
+- D1 plaintext SHA-256 is produced before encryption
+- all source R2 objects are accounted for as either new encrypted copies or reused encrypted copies
+- encrypted private manifest exists and is re-read with matching byte size
+- recovery public-key fingerprint matches the approved key
+- public `/media/_aipt-backups/...` request returns 404
+- no plaintext database rows or media object keys are emitted into GitHub artifacts
 
-After at least 30 days of successful backups and one tested recovery drill, establish an explicit reviewed lifecycle policy. It must never delete the last known-good recovery snapshot or an immutable media object still referenced by a retained manifest.
+AIPT-0003 is COMPLETE only after a real post-deployment production run passes these checks.
 
-## 9. Recovery policy — human approval required
+## Recovery policy — explicit human approval required
 
-There is intentionally NO automated restore workflow in AIPT-0003. Restoration is destructive and requires an explicit incident decision.
+There is deliberately no automated restore path. Restoration mutates production and must be treated as an incident operation.
 
-### 9.1 Before any restore
+Before restore:
 
-1. Declare incident scope and reason.
-2. Record current production commit and D1 schema health.
-3. Run a fresh emergency backup of the current state, even if damaged.
-4. Select the exact recovery timestamp/manifest.
-5. Verify D1 SQL SHA-256 and media references.
-6. Decide whether Time Travel or SQL recovery is appropriate.
-7. Obtain explicit owner approval for production mutation.
+1. record the incident and current production commit;
+2. capture a fresh backup of the current state when possible;
+3. select the exact encrypted snapshot;
+4. retrieve the private recovery key from the Drive recovery vault;
+5. decrypt in an approved secure environment;
+6. verify SHA-256 and object counts against the manifest;
+7. restore into a non-production recovery database/bucket first when technically feasible;
+8. validate catalog, orders, customers, reviews, media relationships and schema;
+9. obtain explicit owner approval before any production mutation.
 
-### 9.2 D1 Time Travel recovery
+## Envelope decryption format
 
-Preferred for a recent accidental data change within Cloudflare's available Time Travel window. Use the private timestamp/bookmark only after the pre-restore backup.
+Every encrypted payload has this binary structure:
 
-Conceptual command:
+- 8 bytes magic: `AIPTBK01`
+- 2 bytes big-endian wrapped-key length
+- RSA-OAEP wrapped AES key
+- 12-byte AES-GCM IV
+- AES-GCM ciphertext/tag
 
-`pnpm exec wrangler d1 time-travel restore aipt-db --bookmark=<PRIVATE_BOOKMARK>`
+Recovery software must reject an unexpected magic/version or invalid authentication tag.
 
-Do not copy a private bookmark into a public issue or PR. Time Travel restore overwrites the database in place and is therefore destructive.
+## Post-recovery verification
 
-### 9.3 SQL recovery
+After any recovery, require:
 
-Use a stored SQL snapshot when the required recovery point is outside Time Travel, a portable copy is required, or recovery should first be validated away from production.
+- `/api/healthz` healthy
+- `/api/db-schema` expected migration
+- `/api/products` non-empty and plausible
+- representative product detail/media healthy
+- cart/checkout/order tracking routes load
+- unauthenticated admin APIs remain rejected
+- homepage/products/policy routes pass production monitor
+- robots/sitemap/manifest remain healthy
+- no canonical/indexing regression
 
-Preferred procedure:
+Then immediately create a fresh encrypted backup of the recovered state.
 
-1. Download the selected private SQL snapshot to an approved secure environment.
-2. Verify SHA-256 against the private manifest.
-3. Create/use a temporary recovery D1 database when technically feasible.
-4. Import the SQL snapshot there first.
-5. Validate schema, catalog, orders, customers, reviews and media relationships.
-6. Only then plan controlled production restoration.
+## Security history
 
-Never blindly execute an old SQL dump against production.
-
-### 9.4 R2 media recovery
-
-For each source object in the selected manifest, retrieve its immutable `backup_key`, restore to the original `aipt-media` key, reapply required HTTP metadata/content type, and verify byte size/content identity and public delivery. Never delete the backup copy after restoration.
-
-## 10. Post-recovery verification gate
-
-A recovery is incomplete until production health, D1 schema, catalog, representative product/media, checkout, tracking, admin 401 gates, public routes, robots/sitemap/llms/manifest, plausible D1 counts and canonical SEO checks pass. After validation, create a NEW backup of the recovered state.
-
-## 11. Backup failure policy
-
-A failed backup must never delete or mutate existing backups or production data. Preserve prior snapshots, inspect the failure class, and never weaken identity/checksum gates just to make the workflow green.
-
-## 12. Dedicated Cloudflare backup credential
-
-Do NOT broaden or reuse the production deployment token silently. The backup workflow now requires a separate GitHub Actions secret:
-
-`CLOUDFLARE_BACKUP_API_TOKEN`
-
-The dedicated Cloudflare custom token should be scoped to the correct AIPT Cloudflare account and contain only the permissions necessary for this backup workflow:
-
-- Account -> D1 -> Read
-- Account -> Workers R2 Storage -> Edit / Write
-
-`Workers R2 Storage Edit/Write` is required because the job must create/inspect the private backup bucket and read/write/list R2 objects. The existing `CLOUDFLARE_API_TOKEN` was tested on 2026-09-03 and Cloudflare returned HTTP 403 for R2 management, so it is intentionally no longer used by this backup workflow.
-
-Keep the existing `CLOUDFLARE_ACCOUNT_ID` secret unchanged.
-
-Never use a Global API Key for this workflow.
-
-## 13. Verified blocker from first real run
-
-PR #276 launched the real same-repository backup job on 2026-09-03. Results:
-
-- GitHub/Cloudflare secret presence gate: PASS
-- dependency/runtime setup: PASS
-- R2 backup-bucket inspection using existing deploy token: FAIL CLOSED with Cloudflare HTTP 403 / Authentication error
-- production mutation: NONE
-- sensitive data exposure: NONE
-
-Resolution: create the dedicated token above and save it as GitHub Actions secret `CLOUDFLARE_BACKUP_API_TOKEN`, then re-run PR #276. Do not mark AIPT-0003 complete before that real run passes.
-
-## 14. AIPT-0003 acceptance criteria
-
-PASS only when a real run proves:
-
-- correct production D1 identity verified
-- D1 backend is `production`
-- Time Travel bookmark captured privately
-- full D1 SQL export created and hashed
-- private `aipt-backups` bucket exists
-- SQL snapshot uploaded privately
-- all current `aipt-media` objects inventoried
-- every current media object has an immutable backup reference
-- private manifest uploaded and verified
-- no backup payload appears in GitHub artifacts/logs/repository
-- live storefront/data remain unmodified by backup operations
-
-Until the real workflow run passes, this step remains `BLOCKED`, not `COMPLETE`.
-
-## 15. Official technical references checked for this design
-
-Cloudflare D1 Time Travel and backups: https://developers.cloudflare.com/d1/reference/time-travel/  
-Cloudflare D1 import/export: https://developers.cloudflare.com/d1/best-practices/import-export-data/  
-Cloudflare D1 Wrangler commands: https://developers.cloudflare.com/d1/wrangler-commands/  
-Cloudflare API token permissions: https://developers.cloudflare.com/fundamentals/api/reference/permissions/  
-Cloudflare R2 authentication: https://developers.cloudflare.com/r2/api/tokens/  
-Cloudflare R2 API: https://developers.cloudflare.com/r2/api/  
-Cloudflare R2 object API: https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/objects/  
-Cloudflare R2 bucket creation: https://developers.cloudflare.com/r2/buckets/create-buckets/
+Earlier AIPT-0003 experiments proved the existing Cloudflare deploy token has insufficient D1/R2 management permissions. The system deliberately did **not** broaden that deployment credential. Instead, AIPT moved to GitHub OIDC + runtime D1/R2 bindings, eliminating the manual backup-token dependency and reducing long-lived credential exposure.
