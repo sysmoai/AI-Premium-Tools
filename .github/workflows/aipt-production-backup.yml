@@ -1,0 +1,102 @@
+name: AIPT Production Backup
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 21 * * *'
+  workflow_run:
+    workflows: ['Validate and Deploy AIPT']
+    types: [completed]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: aipt-production-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Request short-lived GitHub OIDC identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          response=$(curl --fail --silent --show-error \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=aipt-production-backup")
+          token=$(printf '%s' "$response" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!x.value)process.exit(1);process.stdout.write(x.value)})')
+          echo "::add-mask::$token"
+          printf '%s' "$token" > /tmp/aipt-oidc-token
+          unset token response
+
+      - name: Capture encrypted production backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          token=$(cat /tmp/aipt-oidc-token)
+          code=$(curl --silent --show-error \
+            --connect-timeout 10 --max-time 1500 \
+            --request POST \
+            --header "Authorization: Bearer ${token}" \
+            --header 'Accept: application/json' \
+            --output /tmp/aipt-backup-summary.json \
+            --write-out '%{http_code}' \
+            'https://aipremium.tools/internal/aipt-backup')
+          if [ "$code" != '200' ]; then
+            echo "Backup endpoint returned HTTP ${code}" >&2
+            node -e 'const fs=require("fs");try{const x=JSON.parse(fs.readFileSync("/tmp/aipt-backup-summary.json","utf8"));console.error(x?.error||"Backup failed")}catch{}'
+            exit 1
+          fi
+          node <<'NODE'
+          const fs = require('fs');
+          const x = JSON.parse(fs.readFileSync('/tmp/aipt-backup-summary.json', 'utf8'));
+          if (x.status !== 'ok' || x.verified !== true) throw new Error('Backup did not report verified status=ok');
+          if (!x.snapshot_id || !x.encryption_key_fingerprint) throw new Error('Backup identity evidence incomplete');
+          if (!x.database || x.database.tables < 1 || x.database.rows < 1 || !x.database.plaintext_sha256) throw new Error('Database backup evidence incomplete');
+          if (!x.media || x.media.source_objects < 0) throw new Error('Media backup evidence incomplete');
+          if (x.media.new_copies + x.media.reused_copies !== x.media.source_objects) throw new Error('Media backup accounting mismatch');
+          if (!x.manifest_plaintext_sha256) throw new Error('Manifest verification evidence incomplete');
+          const lines = [
+            '# AIPT production backup',
+            '',
+            `- Status: **${x.status.toUpperCase()} / VERIFIED**`,
+            `- Captured: ${x.captured_at}`,
+            `- Snapshot ID: \`${x.snapshot_id}\``,
+            `- Recovery public-key fingerprint: \`${x.encryption_key_fingerprint}\``,
+            `- D1 logical snapshot: ${x.database.tables} table(s), ${x.database.rows} row(s)`,
+            `- D1 plaintext bytes before encryption: ${x.database.plaintext_bytes}`,
+            `- D1 plaintext SHA-256: \`${x.database.plaintext_sha256}\``,
+            `- R2 source media: ${x.media.source_objects} object(s) / ${x.media.source_bytes} bytes`,
+            `- New encrypted media copies: ${x.media.new_copies}`,
+            `- Existing encrypted media reused: ${x.media.reused_copies}`,
+            `- Private manifest SHA-256: \`${x.manifest_plaintext_sha256}\``,
+            '',
+            '> Backup payloads and original object keys are encrypted. No plaintext database rows, customer data, payment data, or media keys are uploaded to GitHub artifacts.',
+          ];
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
+          fs.writeFileSync('/tmp/aipt-snapshot-id', x.snapshot_id);
+          NODE
+
+      - name: Verify backup namespace is not publicly downloadable
+        shell: bash
+        run: |
+          set -euo pipefail
+          snapshot=$(cat /tmp/aipt-snapshot-id)
+          code=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            "https://aipremium.tools/media/_aipt-backups/${snapshot}/manifest.json.enc")
+          if [ "$code" != '404' ]; then
+            echo "Encrypted backup namespace must return 404 publicly; got HTTP ${code}" >&2
+            exit 1
+          fi
+          echo 'Reserved backup media namespace correctly returns 404.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove local authentication and summary traces
+        if: always()
+        shell: bash
+        run: rm -f /tmp/aipt-oidc-token /tmp/aipt-backup-summary.json /tmp/aipt-snapshot-id
