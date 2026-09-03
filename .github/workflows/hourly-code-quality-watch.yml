@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/hourly-code-quality-watch.yml'
+      - 'scripts/aipt-repository-isolation-guard.mjs'
       - '.gitignore'
 
 permissions:
@@ -38,6 +39,11 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
+
+      - name: Repository/business-unit isolation guard
+        id: isolation
+        continue-on-error: true
+        run: node scripts/aipt-repository-isolation-guard.mjs
 
       - name: Install dependencies
         id: install
@@ -115,6 +121,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
+          ISOLATION_RESULT: ${{ steps.isolation.outcome }}
           INSTALL_RESULT: ${{ steps.install.outcome }}
           TYPECHECK_RESULT: ${{ steps.typecheck.outcome }}
           TEST_RESULT: ${{ steps.tests.outcome }}
@@ -128,6 +135,7 @@ jobs:
           failed=0
 
           for value in \
+            "$ISOLATION_RESULT" \
             "$INSTALL_RESULT" \
             "$TYPECHECK_RESULT" \
             "$TEST_RESULT" \
@@ -145,6 +153,7 @@ jobs:
             echo
             echo '| Gate | Result |'
             echo '|---|---|'
+            echo "| AIPT business-unit isolation | ${ISOLATION_RESULT} |"
             echo "| Install | ${INSTALL_RESULT} |"
             echo "| Typecheck | ${TYPECHECK_RESULT} |"
             echo "| Tests | ${TEST_RESULT} |"
