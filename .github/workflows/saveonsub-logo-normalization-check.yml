@@ -1,0 +1,44 @@
+name: SaveOnSub Logo Normalization Check
+
+on:
+  push:
+    branches:
+      - ops/saveonsub-cloudflare-diagnose-20260903
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Compare approved source SVG to live SVG
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth=1 --branch=main https://github.com/sysmoai/saveonsub-store.git source >/dev/null 2>&1
+          curl -LsS -o /tmp/live.svg https://saveonsub.com/assets/logo.svg
+          python3 - <<'PY'
+          import hashlib, pathlib
+          src = pathlib.Path('source/assets/logo.svg').read_bytes()
+          live = pathlib.Path('/tmp/live.svg').read_bytes()
+          marker = b' data-brand-lock="2026-08-19-approved"'
+          normalized = src.replace(marker, b'', 1)
+          def h(x): return hashlib.sha256(x).hexdigest()
+          print('source_sha=' + h(src))
+          print('source_normalized_sha=' + h(normalized))
+          print('live_sha=' + h(live))
+          print('source_marker=' + ('yes' if marker in src else 'no'))
+          print('live_marker=' + ('yes' if marker in live else 'no'))
+          print('exact_match=' + ('yes' if src == live else 'no'))
+          print('normalized_match=' + ('yes' if normalized == live else 'no'))
+          if normalized != live:
+              limit=min(len(normalized),len(live))
+              pos=next((i for i in range(limit) if normalized[i]!=live[i]), limit)
+              print(f'first_diff={pos} source_len={len(normalized)} live_len={len(live)}')
+              print('source_prefix=' + normalized[max(0,pos-40):pos+80].decode('utf-8','replace'))
+              print('live_prefix=' + live[max(0,pos-40):pos+80].decode('utf-8','replace'))
+              raise SystemExit(1)
+          print('LOGO_NORMALIZATION_CHECK=PASS')
+          PY
