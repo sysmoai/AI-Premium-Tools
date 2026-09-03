@@ -93,39 +93,77 @@ async function verifyGithubOidc(request: Request): Promise<void> {
 type ProductRow = {
   id: number;
   name: string;
+  description: string | null;
+  short_description: string | null;
   sku: string | null;
   slug: string | null;
   plan_type: string | null;
   delivery_type: string | null;
   commercial_state: string;
+  seo_title: string | null;
+  seo_description: string | null;
+  seo_index: number;
   is_active: number;
+  media_count: number;
 };
+
+function present(value: unknown): boolean {
+  return value != null && String(value).trim().length > 0;
+}
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try {
     await verifyGithubOidc(request);
     const result = await env.DB.prepare(
-      `SELECT id, name, sku, slug, plan_type, delivery_type, commercial_state, is_active
-       FROM products
-       ORDER BY id ASC`,
+      `SELECT p.id, p.name, p.description, p.short_description, p.sku, p.slug,
+              p.plan_type, p.delivery_type, p.commercial_state, p.seo_title,
+              p.seo_description, p.seo_index, p.is_active,
+              (SELECT COUNT(*) FROM product_media pm WHERE pm.product_id = p.id) AS media_count
+       FROM products p
+       ORDER BY p.id ASC`,
     ).all<ProductRow>();
 
-    const rows = (result.results || []).map((row) => ({
-      id: Number(row.id),
-      name: String(row.name || ""),
-      sku: row.sku == null ? null : String(row.sku),
-      slug: row.slug == null ? null : String(row.slug),
-      plan_type: row.plan_type == null ? null : String(row.plan_type),
-      delivery_type: row.delivery_type == null ? null : String(row.delivery_type),
-      commercial_state: String(row.commercial_state || "").toUpperCase(),
-      is_active: Number(row.is_active),
-    }));
+    const rows = (result.results || []).map((row) => {
+      const fields = {
+        description: present(row.description),
+        short_description: present(row.short_description),
+        sku: present(row.sku),
+        slug: present(row.slug),
+        plan_type: present(row.plan_type),
+        delivery_type: present(row.delivery_type),
+        seo_title: present(row.seo_title),
+        seo_description: present(row.seo_description),
+        media: Number(row.media_count || 0) > 0,
+      };
+      const completeCount = Object.values(fields).filter(Boolean).length;
+      return {
+        id: Number(row.id),
+        name: String(row.name || ""),
+        sku: row.sku == null ? null : String(row.sku),
+        slug: row.slug == null ? null : String(row.slug),
+        plan_type: row.plan_type == null ? null : String(row.plan_type),
+        delivery_type: row.delivery_type == null ? null : String(row.delivery_type),
+        commercial_state: String(row.commercial_state || "").toUpperCase(),
+        seo_index: Number(row.seo_index),
+        is_active: Number(row.is_active),
+        media_count: Number(row.media_count || 0),
+        completeness: {
+          fields,
+          score: Math.round((completeCount / Object.keys(fields).length) * 100),
+          missing: Object.entries(fields).filter(([, ok]) => !ok).map(([key]) => key),
+        },
+      };
+    });
 
     const invalid = rows.filter((row) => !Number.isInteger(row.id) || !row.name || !ALLOWED_STATES.has(row.commercial_state));
     if (invalid.length) return json({ status: "error", error: "invalid commercial-state data", invalid_count: invalid.length }, 500);
 
     const active = rows.filter((row) => row.is_active !== 0);
     const counts = Object.fromEntries([...ALLOWED_STATES].map((state) => [state, active.filter((row) => row.commercial_state === state).length]));
+    const scoreDistribution = {
+      complete_100: active.filter((row) => row.completeness.score === 100).length,
+      incomplete: active.filter((row) => row.completeness.score < 100).length,
+    };
     return json({
       status: "ok",
       captured_at: new Date().toISOString(),
@@ -133,6 +171,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       total_products: rows.length,
       active_products: active.length,
       commercial_state_counts: counts,
+      completeness_counts: scoreDistribution,
       rows: active,
     });
   } catch (error) {
