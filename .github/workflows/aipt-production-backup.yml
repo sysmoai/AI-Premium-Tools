@@ -1,0 +1,105 @@
+name: AIPT Production Backup
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/aipt-production-backup.yml'
+      - 'scripts/aipt-production-backup.mjs'
+      - 'docs/operations/AIPT-0003-DATA-BACKUP-RECOVERY.md'
+  workflow_dispatch:
+  schedule:
+    - cron: '17 21 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aipt-production-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    # Never expose Cloudflare secrets to fork PRs. Same-repository PRs are allowed
+    # so this workflow can be verified before merging; schedule/dispatch run from main.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate backup target and secret presence
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RAW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
+          account_id=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_ACCOUNT_ID||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
+          if ! [[ "$account_id" =~ ^[0-9a-fA-F]{32}$ ]]; then
+            echo 'Invalid Cloudflare account ID format'
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "CLOUDFLARE_API_TOKEN=$token" >> "$GITHUB_ENV"
+          echo "CLOUDFLARE_ACCOUNT_ID=$account_id" >> "$GITHUB_ENV"
+          unset token account_id
+
+      - name: Capture and verify private production backup
+        shell: bash
+        env:
+          AIPT_BACKUP_SAFE_SUMMARY: /tmp/aipt-backup-safe-summary.json
+        run: |
+          set -euo pipefail
+          node scripts/aipt-production-backup.mjs > /tmp/aipt-backup-console.json
+          test -s /tmp/aipt-backup-safe-summary.json
+          node <<'NODE'
+          const fs = require('fs');
+          const x = JSON.parse(fs.readFileSync('/tmp/aipt-backup-safe-summary.json', 'utf8'));
+          if (x.status !== 'ok') throw new Error('Backup did not report status=ok');
+          if (x.source_db !== 'aipt-db' || x.source_db_version !== 'production') throw new Error('Unexpected D1 backup source');
+          if (!x.d1_time_travel_bookmark_captured || !x.d1_export_sha256) throw new Error('D1 recovery evidence incomplete');
+          if (x.source_media_objects !== x.copied_media_objects) throw new Error('R2 copy count mismatch');
+          if (x.backup_objects_verified !== x.source_media_objects + 2) throw new Error('Private backup verification count mismatch');
+          const lines = [
+            '# AIPT production backup',
+            '',
+            `- Status: **${x.status.toUpperCase()}**`,
+            `- Captured: ${x.captured_at}`,
+            `- D1 backend: ${x.source_db_version}`,
+            `- D1 Time Travel bookmark captured: yes (hash ${x.d1_time_travel_bookmark_sha256_12})`,
+            `- D1 export: ${x.d1_export_bytes} bytes`,
+            `- D1 SHA-256: \`${x.d1_export_sha256}\``,
+            `- Source R2 media: ${x.source_media_objects} objects / ${x.source_media_bytes} bytes`,
+            `- R2 media copied: ${x.copied_media_objects} objects / ${x.copied_media_bytes} bytes`,
+            `- Inventory SHA-256: \`${x.source_media_inventory_sha256}\``,
+            `- Private backup bucket: \`${x.backup_bucket}\``,
+            `- Private backup prefix: \`${x.backup_prefix}\``,
+            `- Backup objects verified: ${x.backup_objects_verified}`,
+            '',
+            '> The SQL dump, full Time Travel bookmark, object keys, and private manifest are intentionally NOT uploaded as GitHub artifacts or printed to logs.',
+          ];
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
+          NODE
+
+      - name: Remove local backup traces
+        if: always()
+        shell: bash
+        run: |
+          rm -f /tmp/aipt-backup-safe-summary.json /tmp/aipt-backup-console.json
