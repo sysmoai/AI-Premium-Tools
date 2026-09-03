@@ -75,8 +75,9 @@ jobs:
           if (x.status !== 'ok') throw new Error('Backup did not report status=ok');
           if (x.source_db !== 'aipt-db' || x.source_db_version !== 'production') throw new Error('Unexpected D1 backup source');
           if (!x.d1_time_travel_bookmark_captured || !x.d1_export_sha256) throw new Error('D1 recovery evidence incomplete');
-          if (x.source_media_objects !== x.copied_media_objects) throw new Error('R2 copy count mismatch');
-          if (x.backup_objects_verified !== x.source_media_objects + 2) throw new Error('Private backup verification count mismatch');
+          if (x.source_media_objects !== x.media_objects_verified) throw new Error('R2 mirror verification count mismatch');
+          if (x.new_media_objects_copied + x.reused_media_objects !== x.source_media_objects) throw new Error('R2 deduplication accounting mismatch');
+          if (x.snapshot_objects_verified !== 2) throw new Error('Snapshot metadata/data verification mismatch');
           const lines = [
             '# AIPT production backup',
             '',
@@ -87,11 +88,12 @@ jobs:
             `- D1 export: ${x.d1_export_bytes} bytes`,
             `- D1 SHA-256: \`${x.d1_export_sha256}\``,
             `- Source R2 media: ${x.source_media_objects} objects / ${x.source_media_bytes} bytes`,
-            `- R2 media copied: ${x.copied_media_objects} objects / ${x.copied_media_bytes} bytes`,
+            `- R2 mirror verified: ${x.media_objects_verified} objects`,
+            `- New media copied this run: ${x.new_media_objects_copied} objects / ${x.new_media_bytes_copied} bytes`,
+            `- Existing immutable media reused: ${x.reused_media_objects} objects`,
             `- Inventory SHA-256: \`${x.source_media_inventory_sha256}\``,
             `- Private backup bucket: \`${x.backup_bucket}\``,
-            `- Private backup prefix: \`${x.backup_prefix}\``,
-            `- Backup objects verified: ${x.backup_objects_verified}`,
+            `- Private snapshot prefix: \`${x.backup_prefix}\``,
             '',
             '> The SQL dump, full Time Travel bookmark, object keys, and private manifest are intentionally NOT uploaded as GitHub artifacts or printed to logs.',
           ];
