@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/hourly-code-quality-watch.yml'
+      - '.gitignore'
 
 permissions:
   contents: read
@@ -24,6 +25,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -87,12 +90,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bad=$(git ls-files | grep -E '(^|/)(\.env|\.env\.local|\.env\.production|wrangler\.toml\.secret)$' || true)
-          if [ -n "$bad" ]; then
-            printf 'Tracked sensitive environment file(s):\n%s\n' "$bad"
+
+          # Secret-bearing local configuration must never be tracked. Keep the
+          # documented .env.example template allowed.
+          bad_files=$(git ls-files | grep -E '(^|/)(\.env($|\.)|\.dev\.vars($|\.)|wrangler\.toml\.secret$)' | grep -v -E '(^|/)\.env\.example$' || true)
+          if [ -n "$bad_files" ]; then
+            printf 'Tracked sensitive environment/config file(s):\n%s\n' "$bad_files"
             exit 1
           fi
-          echo 'No forbidden environment files are tracked.'
+
+          # Fail on unmistakable private-key blocks or common live-token
+          # prefixes in the current tracked tree. This supplements GitHub's
+          # platform scanning; it does not claim to prove historical rotation.
+          if git grep -I -n -E -- '-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|sk_live_[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}' -- .; then
+            echo 'Potential live secret/private key detected in tracked content.'
+            exit 1
+          fi
+
+          echo 'No forbidden secret files or high-confidence credential patterns are tracked.'
 
       - name: Report, reconcile incident and enforce quality gates
         if: always()
