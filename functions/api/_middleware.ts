@@ -90,7 +90,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (request.method === "POST" && apiPath === "/orders") {
     let body: { items?: Array<{ product_id?: number; quantity?: number }> };
     try {
-      body = await request.clone().json();
+      body = await request.clone().json() as { items?: Array<{ product_id?: number; quantity?: number }> };
     } catch {
       return responseJson({ error: "Invalid order payload" }, 400);
     }
@@ -131,7 +131,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // project their approved BDT price. Raw D1 remains available to admins.
   if (apiPath === "/products") {
     try {
-      const data = await downstream.clone().json<unknown>();
+      const data = await downstream.clone().json() as unknown;
       if (!Array.isArray(data)) return downstream;
       const safe = data
         .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
@@ -150,7 +150,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // return a safe unavailable response until an approved mapping exists.
   if (/^\/products\/\d+$/.test(apiPath)) {
     try {
-      const item = await downstream.clone().json<Record<string, unknown>>();
+      const item = await downstream.clone().json() as Record<string, unknown>;
       const rule = ruleFor(item?.name);
       if (!rule || !item?.is_active) {
         return responseJson(
@@ -169,7 +169,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // legacy rows retained in D1 for audit/history.
   if (apiPath === "/categories") {
     try {
-      const categories = await downstream.clone().json<Array<Record<string, unknown>>>();
+      const categories = await downstream.clone().json() as Array<Record<string, unknown>>;
       if (!Array.isArray(categories)) return downstream;
       const rows = await env.DB
         .prepare("SELECT name, category_id, is_active FROM products")
