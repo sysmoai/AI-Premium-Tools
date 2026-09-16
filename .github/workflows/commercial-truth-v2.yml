@@ -1,0 +1,129 @@
+name: AIPT Commercial Truth v2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aipt-commercial-truth-v2
+  cancel-in-progress: false
+
+jobs:
+  normalize-production-catalog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout exact main release
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify exact Cloudflare Pages and D1 target
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RAW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EXPECTED_D1_DATABASE_ID: '9c19dfdb-aead-4bed-b6ff-f6bf379bc296'
+        run: |
+          set -euo pipefail
+          token=$(node -e 'const value=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim(); if(!value) process.exit(1); process.stdout.write(value)')
+          account_id=$(node -e 'const value=(process.env.RAW_CLOUDFLARE_ACCOUNT_ID||"").trim(); if(!value) process.exit(1); process.stdout.write(value)')
+          if ! [[ "$account_id" =~ ^[0-9a-fA-F]{32}$ ]]; then
+            echo 'Invalid Cloudflare account ID format'
+            exit 1
+          fi
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${token}" \
+            --header 'Content-Type: application/json' \
+            "https://api.cloudflare.com/client/v4/accounts/${account_id}/pages/projects/ai-premium-tools" \
+            > /tmp/aipt-pages-project.json
+          EXPECTED_D1_DATABASE_ID="$EXPECTED_D1_DATABASE_ID" node <<'NODE'
+          const x = require('/tmp/aipt-pages-project.json');
+          const project = x?.result;
+          const id = project?.deployment_configs?.production?.d1_databases?.DB?.id ?? null;
+          if (!x?.success || project?.name !== 'ai-premium-tools') throw new Error('Cloudflare Pages project identity check failed');
+          if (id !== process.env.EXPECTED_D1_DATABASE_ID) throw new Error(`Production Pages DB binding mismatch: ${id}`);
+          console.log(`Verified production target: ai-premium-tools / ${id}`);
+          NODE
+          echo "CF_TOKEN=$token" >> "$GITHUB_ENV"
+          echo "CF_ACCOUNT=$account_id" >> "$GITHUB_ENV"
+          rm -f /tmp/aipt-pages-project.json
+
+      - name: Apply approved pricing/access normalization
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLOUDFLARE_API_TOKEN="$CF_TOKEN" CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT" \
+            pnpm exec wrangler d1 execute aipt-db --remote --file=ops/aipt-commercial-truth-v2.sql
+
+      - name: Verify normalized production commerce rows
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLOUDFLARE_API_TOKEN="$CF_TOKEN" CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT" \
+            pnpm exec wrangler d1 execute aipt-db --remote --json \
+            --command="SELECT name, price_bdt, is_active, commercial_state FROM products WHERE is_active = 1 ORDER BY id" \
+            > /tmp/aipt-active-products.json
+
+          node <<'NODE'
+          const fs = require('fs');
+          const payload = JSON.parse(fs.readFileSync('/tmp/aipt-active-products.json', 'utf8'));
+          const result = Array.isArray(payload) ? payload[0] : payload;
+          const rows = result?.results ?? result?.result?.[0]?.results ?? [];
+          if (!Array.isArray(rows) || rows.length < 10) throw new Error(`Expected at least 10 verified active plans, found ${rows.length}`);
+
+          const rules = [
+            [/^ChatGPT Plus.*Personal$/i, 3390], [/^ChatGPT Go.*Personal$/i, 1299],
+            [/^Claude Pro.*Personal$/i, 3390], [/^Claude Max 5x.*Personal$/i, 16790], [/^Claude Max 20x.*Personal$/i, 33590],
+            [/^Google AI Pro(?: \(Gemini Advanced\))?$/i, 3390], [/^SuperGrok(?! Lite).*Personal$/i, 5090],
+            [/^Perplexity Pro.*Personal$/i, 3390], [/^Perplexity Max.*Personal$/i, 33590],
+            [/^Midjourney Standard.*Personal$/i, 5090], [/^Midjourney Pro.*Personal$/i, 10090], [/^Midjourney Mega.*Personal$/i, 20190],
+            [/^Ideogram Plus.*Personal$/i, 3390], [/^Ideogram Pro.*Personal$/i, 10090],
+            [/^Runway Standard.*Personal$/i, 2690], [/^Runway Pro.*Personal$/i, 5890],
+            [/^ElevenLabs Starter.*Personal$/i, 1390], [/^ElevenLabs Creator.*Personal$/i, 3690], [/^ElevenLabs Pro.*Personal$/i, 16690],
+            [/^Suno AI Pro.*Personal$/i, 1990], [/^Suno AI Premier.*Personal$/i, 5090],
+            [/^GitHub Copilot Pro(?!\+).*Personal$/i, 1990], [/^GitHub Copilot Pro\+.*Personal$/i, 6590],
+            [/^Cursor Pro(?!\+).*Personal$/i, 3390], [/^Cursor Pro\+.*Personal$/i, 10090], [/^Replit Core.*Personal$/i, 3390],
+          ];
+
+          for (const row of rows) {
+            if (/shared/i.test(String(row.name))) throw new Error(`Shared credential offer remained active: ${row.name}`);
+            if (row.commercial_state !== 'CUSTOMER_OWNED') throw new Error(`Unexpected commercial state for ${row.name}: ${row.commercial_state}`);
+            const rule = rules.find(([rx]) => rx.test(String(row.name)));
+            if (!rule) throw new Error(`Unmapped active product: ${row.name}`);
+            if (Number(row.price_bdt) !== rule[1]) throw new Error(`Price mismatch for ${row.name}: ${row.price_bdt} != ${rule[1]}`);
+          }
+
+          const required = [
+            ['ChatGPT Plus', 3390], ['Claude Pro', 3390], ['Google AI Pro', 3390],
+            ['Perplexity Pro', 3390], ['Midjourney Standard', 5090],
+          ];
+          for (const [needle, price] of required) {
+            if (!rows.some((row) => String(row.name).includes(needle) && Number(row.price_bdt) === price)) {
+              throw new Error(`Required mapped product missing: ${needle}`);
+            }
+          }
+          console.log(`AIPT Commercial Truth v2 verified ${rows.length} active direct-sale plan(s).`);
+          NODE
+
+          rm -f /tmp/aipt-active-products.json
+          unset CF_TOKEN CF_ACCOUNT
