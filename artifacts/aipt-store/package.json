@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --config vite.config.ts --host 0.0.0.0",
-    "build": "node ../../scripts/aipt-commercial-build-guard.mjs pre && vite build --config vite.config.ts && node ../../scripts/aipt-commercial-build-guard.mjs post",
+    "build": "node ../../scripts/aipt-static-commercial-remediation.mjs && node ../../scripts/aipt-commercial-build-guard.mjs pre && vite build --config vite.config.ts && node ../../scripts/aipt-commercial-build-guard.mjs post",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "test": "vitest run",
     "test:watch": "vitest",
