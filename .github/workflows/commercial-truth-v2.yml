@@ -15,7 +15,7 @@ concurrency:
 jobs:
   normalize-production-catalog:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout exact main release
@@ -37,93 +37,226 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify exact Cloudflare Pages and D1 target
+      - name: Build hardened storefront artifact
+        run: pnpm --filter @workspace/aipt-store run build
+        env:
+          PORT: '8080'
+          BASE_PATH: '/'
+          VITE_SITE_URL: 'https://aipremium.tools'
+
+      - name: Normalize production catalog through isolated Pages binding
         shell: bash
         env:
           RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           RAW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           EXPECTED_D1_DATABASE_ID: '9c19dfdb-aead-4bed-b6ff-f6bf379bc296'
+          PROJECT_NAME: 'ai-premium-tools'
+          NORMALIZATION_BRANCH: 'aipt-commercial-v2-20260917'
         run: |
           set -euo pipefail
-          token=$(node -e 'const value=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim(); if(!value) process.exit(1); process.stdout.write(value)')
-          account_id=$(node -e 'const value=(process.env.RAW_CLOUDFLARE_ACCOUNT_ID||"").trim(); if(!value) process.exit(1); process.stdout.write(value)')
+
+          token=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_API_TOKEN||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
+          account_id=$(node -e 'const v=(process.env.RAW_CLOUDFLARE_ACCOUNT_ID||"").trim(); if(!v) process.exit(1); process.stdout.write(v)')
+          echo "::add-mask::${token}"
+          nonce=$(node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("hex"))')
+          echo "::add-mask::${nonce}"
+
           if ! [[ "$account_id" =~ ^[0-9a-fA-F]{32}$ ]]; then
             echo 'Invalid Cloudflare account ID format'
             exit 1
           fi
-          curl --fail --silent --show-error \
-            --header "Authorization: Bearer ${token}" \
-            --header 'Content-Type: application/json' \
-            "https://api.cloudflare.com/client/v4/accounts/${account_id}/pages/projects/ai-premium-tools" \
-            > /tmp/aipt-pages-project.json
+
+          project_url="https://api.cloudflare.com/client/v4/accounts/${account_id}/pages/projects/${PROJECT_NAME}"
+          deployments_url="${project_url}/deployments"
+          preview_config_modified=0
+          mutation_deployment_seen=0
+          mutation_deployment_id=""
+
+          cf_get() {
+            curl --fail --silent --show-error \
+              --header "Authorization: Bearer ${token}" \
+              --header 'Content-Type: application/json' \
+              "$1"
+          }
+
+          cf_patch() {
+            curl --fail --silent --show-error \
+              --request PATCH \
+              --header "Authorization: Bearer ${token}" \
+              --header 'Content-Type: application/json' \
+              --data "$2" \
+              "$1"
+          }
+
+          deploy_preview() {
+            CLOUDFLARE_API_TOKEN="$token" CLOUDFLARE_ACCOUNT_ID="$account_id" \
+              pnpm exec wrangler pages deploy artifacts/aipt-store/dist/public \
+              --project-name="$PROJECT_NAME" --branch="$NORMALIZATION_BRANCH"
+          }
+
+          cleanup() {
+            original_exit=$?
+            set +e
+            echo 'Starting guaranteed commercial-normalization cleanup'
+
+            if [ "$preview_config_modified" = "1" ]; then
+              cf_patch "$project_url" '{"deployment_configs":{"preview":{"d1_databases":{"DB":null},"env_vars":{"AIPT_COMMERCIAL_V2_NONCE":null}}}}' > /tmp/aipt-commercial-cleanup-config.json
+              if [ $? -ne 0 ]; then
+                echo 'ERROR: failed to remove temporary preview DB/secret config'
+                original_exit=1
+              else
+                preview_config_modified=0
+              fi
+            fi
+
+            rm -f functions/__aipt_internal_commercial_v2.ts
+
+            if [ "$mutation_deployment_seen" = "1" ]; then
+              mv wrangler.toml /tmp/aipt-commercial-wrangler.toml 2>/dev/null || true
+              deploy_preview > /tmp/aipt-commercial-clean-deploy.txt 2>&1
+              clean_status=$?
+              mv /tmp/aipt-commercial-wrangler.toml wrangler.toml 2>/dev/null || true
+              if [ $clean_status -ne 0 ]; then
+                echo 'ERROR: clean normalization-branch preview redeploy failed'
+                original_exit=1
+              else
+                cf_get "$deployments_url" > /tmp/aipt-commercial-deployments-clean.json
+                NORMALIZATION_BRANCH="$NORMALIZATION_BRANCH" node <<'NODE' > /tmp/aipt-commercial-old-deployment-ids.txt
+          const x = require('/tmp/aipt-commercial-deployments-clean.json');
+          if (!x?.success || !Array.isArray(x.result)) throw new Error('Deployment listing failed during cleanup');
+          const matches = x.result
+            .filter(d => d?.environment === 'preview' && d?.deployment_trigger?.metadata?.branch === process.env.NORMALIZATION_BRANCH)
+            .sort((a,b) => Date.parse(b.created_on) - Date.parse(a.created_on));
+          if (!matches.length) throw new Error('No normalization branch deployment found during cleanup');
+          const newest = matches[0];
+          const secret = newest?.env_vars?.AIPT_COMMERCIAL_V2_NONCE ?? null;
+          const db = newest?.d1_databases?.DB?.id ?? null;
+          if (secret !== null) throw new Error('Latest clean deployment still has normalization secret');
+          if (db !== null) throw new Error('Latest clean deployment still has preview D1 binding');
+          for (const d of matches.slice(1)) console.log(d.id);
+          NODE
+                if [ $? -ne 0 ]; then
+                  original_exit=1
+                else
+                  while IFS= read -r deployment_id; do
+                    [ -z "$deployment_id" ] && continue
+                    status=$(curl --silent --show-error --output /tmp/aipt-commercial-delete-response.json --write-out '%{http_code}' \
+                      --request DELETE \
+                      --header "Authorization: Bearer ${token}" \
+                      --header 'Content-Type: application/json' \
+                      "${deployments_url}/${deployment_id}?force=true")
+                    if [ "$status" != "200" ] && [ "$status" != "204" ]; then
+                      echo "ERROR: failed to delete older normalization deployment (HTTP $status)"
+                      original_exit=1
+                    fi
+                  done < /tmp/aipt-commercial-old-deployment-ids.txt
+                fi
+              fi
+            fi
+
+            cf_get "$project_url" > /tmp/aipt-commercial-project-clean.json
+            node <<'NODE'
+          const x = require('/tmp/aipt-commercial-project-clean.json');
+          const db = x?.result?.deployment_configs?.preview?.d1_databases?.DB?.id ?? null;
+          const secret = x?.result?.deployment_configs?.preview?.env_vars?.AIPT_COMMERCIAL_V2_NONCE ?? null;
+          if (db !== null) throw new Error('Preview DB binding remains after cleanup');
+          if (secret !== null) throw new Error('Preview normalization secret remains after cleanup');
+          console.log('Verified temporary preview D1 binding and secret are absent');
+          NODE
+            if [ $? -ne 0 ]; then original_exit=1; fi
+
+            if [ -n "$mutation_deployment_id" ]; then
+              status=$(curl --silent --show-error --output /tmp/aipt-commercial-deleted-check.json --write-out '%{http_code}' \
+                --header "Authorization: Bearer ${token}" \
+                --header 'Content-Type: application/json' \
+                "${deployments_url}/${mutation_deployment_id}")
+              if [ "$status" = "404" ]; then
+                echo 'Verified mutation-capable preview deployment deleted'
+              else
+                echo "ERROR: mutation-capable preview deployment still resolves in control plane (HTTP $status)"
+                original_exit=1
+              fi
+            fi
+
+            unset token account_id nonce
+            rm -f /tmp/aipt-commercial-*.json /tmp/aipt-commercial-*.txt
+            exit "$original_exit"
+          }
+          trap cleanup EXIT
+
+          cf_get "$project_url" > /tmp/aipt-commercial-project-before.json
           EXPECTED_D1_DATABASE_ID="$EXPECTED_D1_DATABASE_ID" node <<'NODE'
-          const x = require('/tmp/aipt-pages-project.json');
-          const project = x?.result;
-          const id = project?.deployment_configs?.production?.d1_databases?.DB?.id ?? null;
-          if (!x?.success || project?.name !== 'ai-premium-tools') throw new Error('Cloudflare Pages project identity check failed');
-          if (id !== process.env.EXPECTED_D1_DATABASE_ID) throw new Error(`Production Pages DB binding mismatch: ${id}`);
-          console.log(`Verified production target: ai-premium-tools / ${id}`);
+          const x = require('/tmp/aipt-commercial-project-before.json');
+          const productionDb = x?.result?.deployment_configs?.production?.d1_databases?.DB?.id ?? null;
+          const previewDb = x?.result?.deployment_configs?.preview?.d1_databases?.DB?.id ?? null;
+          const previewSecret = x?.result?.deployment_configs?.preview?.env_vars?.AIPT_COMMERCIAL_V2_NONCE ?? null;
+          if (!x?.success || x?.result?.name !== 'ai-premium-tools') throw new Error('Unexpected Cloudflare Pages project');
+          if (productionDb !== process.env.EXPECTED_D1_DATABASE_ID) throw new Error(`Production DB identity mismatch: ${productionDb}`);
+          if (previewDb !== null) throw new Error('Preview DB binding must be absent before normalization');
+          if (previewSecret !== null) throw new Error('Preview normalization secret must be absent before normalization');
+          console.log(`Verified exact production D1 UUID: ${productionDb}`);
           NODE
-          echo "CF_TOKEN=$token" >> "$GITHUB_ENV"
-          echo "CF_ACCOUNT=$account_id" >> "$GITHUB_ENV"
-          rm -f /tmp/aipt-pages-project.json
 
-      - name: Apply approved pricing/access normalization
-        shell: bash
-        run: |
-          set -euo pipefail
-          CLOUDFLARE_API_TOKEN="$CF_TOKEN" CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT" \
-            pnpm exec wrangler d1 execute aipt-db --remote --file=ops/aipt-commercial-truth-v2.sql
+          cp scripts/ops/aipt-commercial-v2-pages-function.ts functions/__aipt_internal_commercial_v2.ts
 
-      - name: Verify normalized production commerce rows
-        shell: bash
-        run: |
-          set -euo pipefail
-          CLOUDFLARE_API_TOKEN="$CF_TOKEN" CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT" \
-            pnpm exec wrangler d1 execute aipt-db --remote --json \
-            --command="SELECT name, price_bdt, is_active, commercial_state FROM products WHERE is_active = 1 ORDER BY id" \
-            > /tmp/aipt-active-products.json
+          add_payload=$(EXPECTED_D1_DATABASE_ID="$EXPECTED_D1_DATABASE_ID" NORMALIZATION_NONCE="$nonce" node -e 'process.stdout.write(JSON.stringify({deployment_configs:{preview:{d1_databases:{DB:{id:process.env.EXPECTED_D1_DATABASE_ID}},env_vars:{AIPT_COMMERCIAL_V2_NONCE:{type:"secret_text",value:process.env.NORMALIZATION_NONCE}}}}}))')
+          cf_patch "$project_url" "$add_payload" > /tmp/aipt-commercial-preview-config-add.json
+          preview_config_modified=1
+          unset add_payload
 
+          mv wrangler.toml /tmp/aipt-commercial-wrangler.toml
+          deploy_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          set +e
+          deploy_preview > /tmp/aipt-commercial-mutation-deploy.txt 2>&1
+          deploy_status=$?
+          set -e
+          mv /tmp/aipt-commercial-wrangler.toml wrangler.toml
+          if [ $deploy_status -ne 0 ]; then
+            echo 'Isolated normalization preview deployment failed'
+            sed -n '1,100p' /tmp/aipt-commercial-mutation-deploy.txt | sed -E 's#https://[^ ]+#<preview-url>#g'
+            exit 1
+          fi
+          mutation_deployment_seen=1
+
+          cf_get "$deployments_url" > /tmp/aipt-commercial-preview-deployments.json
+          NORMALIZATION_BRANCH="$NORMALIZATION_BRANCH" DEPLOY_STARTED="$deploy_started" node <<'NODE' > /tmp/aipt-commercial-mutation-deployment.txt
+          const x = require('/tmp/aipt-commercial-preview-deployments.json');
+          if (!x?.success || !Array.isArray(x.result)) throw new Error('Deployment listing failed');
+          const start = Date.parse(process.env.DEPLOY_STARTED);
+          const matches = x.result
+            .filter(d => d?.environment === 'preview' && d?.deployment_trigger?.metadata?.branch === process.env.NORMALIZATION_BRANCH && Date.parse(d.created_on) >= start - 10000)
+            .sort((a,b) => Date.parse(b.created_on) - Date.parse(a.created_on));
+          if (!matches.length) throw new Error('Normalization deployment could not be identified');
+          const d = matches[0];
+          const url = String(d.url || '').replace(/\/$/, '');
+          if (!/^https:\/\/[a-z0-9-]+\.ai-premium-tools\.pages\.dev$/i.test(url)) throw new Error('Unexpected preview deployment URL');
+          if (d?.d1_databases?.DB?.id !== process.env.EXPECTED_D1_DATABASE_ID) throw new Error('Mutation preview is not bound to the expected D1');
+          if (!d?.env_vars?.AIPT_COMMERCIAL_V2_NONCE) throw new Error('Mutation preview is missing its one-time secret');
+          process.stdout.write(`${d.id}\n${url}\n`);
+          NODE
+          mutation_deployment_id=$(sed -n '1p' /tmp/aipt-commercial-mutation-deployment.txt)
+          mutation_url=$(sed -n '2p' /tmp/aipt-commercial-mutation-deployment.txt)
+
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${nonce}" \
+            --header 'Content-Type: application/json' \
+            --data '{"action":"probe"}' \
+            "${mutation_url}/__aipt_internal_commercial_v2" > /tmp/aipt-commercial-before.json
           node <<'NODE'
-          const fs = require('fs');
-          const payload = JSON.parse(fs.readFileSync('/tmp/aipt-active-products.json', 'utf8'));
-          const result = Array.isArray(payload) ? payload[0] : payload;
-          const rows = result?.results ?? result?.result?.[0]?.results ?? [];
-          if (!Array.isArray(rows) || rows.length < 10) throw new Error(`Expected at least 10 verified active plans, found ${rows.length}`);
-
-          const rules = [
-            [/^ChatGPT Plus.*Personal$/i, 3390], [/^ChatGPT Go.*Personal$/i, 1299],
-            [/^Claude Pro.*Personal$/i, 3390], [/^Claude Max 5x.*Personal$/i, 16790], [/^Claude Max 20x.*Personal$/i, 33590],
-            [/^Google AI Pro(?: \(Gemini Advanced\))?$/i, 3390], [/^SuperGrok(?! Lite).*Personal$/i, 5090],
-            [/^Perplexity Pro.*Personal$/i, 3390], [/^Perplexity Max.*Personal$/i, 33590],
-            [/^Midjourney Standard.*Personal$/i, 5090], [/^Midjourney Pro.*Personal$/i, 10090], [/^Midjourney Mega.*Personal$/i, 20190],
-            [/^Ideogram Plus.*Personal$/i, 3390], [/^Ideogram Pro.*Personal$/i, 10090],
-            [/^Runway Standard.*Personal$/i, 2690], [/^Runway Pro.*Personal$/i, 5890],
-            [/^ElevenLabs Starter.*Personal$/i, 1390], [/^ElevenLabs Creator.*Personal$/i, 3690], [/^ElevenLabs Pro.*Personal$/i, 16690],
-            [/^Suno AI Pro.*Personal$/i, 1990], [/^Suno AI Premier.*Personal$/i, 5090],
-            [/^GitHub Copilot Pro(?!\+).*Personal$/i, 1990], [/^GitHub Copilot Pro\+.*Personal$/i, 6590],
-            [/^Cursor Pro(?!\+).*Personal$/i, 3390], [/^Cursor Pro\+.*Personal$/i, 10090], [/^Replit Core.*Personal$/i, 3390],
-          ];
-
-          for (const row of rows) {
-            if (/shared/i.test(String(row.name))) throw new Error(`Shared credential offer remained active: ${row.name}`);
-            if (row.commercial_state !== 'CUSTOMER_OWNED') throw new Error(`Unexpected commercial state for ${row.name}: ${row.commercial_state}`);
-            const rule = rules.find(([rx]) => rx.test(String(row.name)));
-            if (!rule) throw new Error(`Unmapped active product: ${row.name}`);
-            if (Number(row.price_bdt) !== rule[1]) throw new Error(`Price mismatch for ${row.name}: ${row.price_bdt} != ${rule[1]}`);
-          }
-
-          const required = [
-            ['ChatGPT Plus', 3390], ['Claude Pro', 3390], ['Google AI Pro', 3390],
-            ['Perplexity Pro', 3390], ['Midjourney Standard', 5090],
-          ];
-          for (const [needle, price] of required) {
-            if (!rows.some((row) => String(row.name).includes(needle) && Number(row.price_bdt) === price)) {
-              throw new Error(`Required mapped product missing: ${needle}`);
-            }
-          }
-          console.log(`AIPT Commercial Truth v2 verified ${rows.length} active direct-sale plan(s).`);
+          const x = require('/tmp/aipt-commercial-before.json');
+          if (!x?.ok || x?.revision !== 'aipt-pricing-v2-2026-09-17') throw new Error('Pre-normalization probe failed');
+          console.log(`Production catalog before: total=${x.before.total}, active=${x.before.active}, sharedActive=${x.before.sharedActive}`);
           NODE
 
-          rm -f /tmp/aipt-active-products.json
-          unset CF_TOKEN CF_ACCOUNT
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${nonce}" \
+            --header 'Content-Type: application/json' \
+            --data '{"action":"apply"}' \
+            "${mutation_url}/__aipt_internal_commercial_v2" > /tmp/aipt-commercial-after.json
+          node <<'NODE'
+          const x = require('/tmp/aipt-commercial-after.json');
+          if (!x?.ok || x?.revision !== 'aipt-pricing-v2-2026-09-17') throw new Error(`Commercial normalization failed: ${JSON.stringify(x?.errors || x?.error || 'unknown')}`);
+          if (Number(x?.after?.active || 0) < 10) throw new Error('Too few approved active plans after normalization');
+          if (Number(x?.after?.sharedActive || 0) !== 0) throw new Error('Shared credential offers remained active');
+          console.log(`AIPT Commercial Truth v2 applied: total=${x.after.total}, active=${x.after.active}, sharedActive=${x.after.sharedActive}`);
+          NODE
