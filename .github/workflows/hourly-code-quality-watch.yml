@@ -2,7 +2,7 @@ name: AIPT Hourly Code and Security Quality Watch
 
 on:
   schedule:
-    - cron: '43 * * * *'
+    - cron: '43 2 * * *'
   workflow_dispatch:
   pull_request:
     paths:
