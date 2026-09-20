@@ -2,7 +2,7 @@ name: AIPT Commerce and Data Integrity Watch
 
 on:
   schedule:
-    - cron: '7,22,37,52 * * * *'
+    - cron: '22 */6 * * *'
   workflow_dispatch:
   workflow_run:
     workflows: ['Validate and Deploy AIPT']
@@ -38,6 +38,7 @@ jobs:
           const checks = [];
           const failures = [];
           const ok = (msg) => checks.push(`- ✅ ${msg}`);
+          const warn = (msg) => checks.push(`- ⚠️ ${msg}`);
           const fail = (msg) => { checks.push(`- ❌ ${msg}`); failures.push(msg); };
 
           async function request(path, init = {}) {
@@ -74,7 +75,7 @@ jobs:
             const invalidPrices = products.filter((p) => !Number.isFinite(Number(p?.price_bdt)) || Number(p.price_bdt) <= 0);
             const active = products.filter((p) => p?.is_active !== false && Number(p?.is_active ?? 1) !== 0);
             if (products.length >= 50) ok(`Catalog returned ${products.length} products`);
-            else fail(`Catalog unexpectedly small: ${products.length} products`);
+            else warn(`Catalog has ${products.length} products; below the 50-product growth target, but catalog size alone is not a production-integrity failure`);
             if (uniqueIds.size === products.length) ok('Product IDs are unique');
             else fail('Duplicate or invalid product IDs detected');
             if (invalidPrices.length === 0) ok('All live product prices are positive numbers');

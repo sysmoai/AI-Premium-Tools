@@ -2,7 +2,7 @@ name: Deep AIPT SEO and Content Audit
 
 on:
   schedule:
-    - cron: '17 */6 * * *'
+    - cron: '17 3 * * 1'
   workflow_dispatch:
   workflow_run:
     workflows: ['Validate and Deploy AIPT']
