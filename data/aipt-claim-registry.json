@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "owner": "sysmoai",
+  "verified_at": "2026-09-03",
+  "recheck_at": "2026-10-03",
+  "expiry_behavior": "block_publish",
+  "claims": [
+    {
+      "id": "seller_identity",
+      "value": "AIPT — AI Premium Tools is the seller/support entity; third-party service names and trademarks belong to their providers.",
+      "source": "BRAND_SYSTEM.md"
+    },
+    {
+      "id": "currency",
+      "value": "Checkout prices and orders are denominated in BDT.",
+      "source": "artifacts/aipt-store/src/pages/checkout.tsx"
+    },
+    {
+      "id": "payment_methods",
+      "value": "Current checkout methods are bKash, Nagad, and Bank Transfer.",
+      "source": "artifacts/aipt-store/src/pages/checkout.tsx"
+    },
+    {
+      "id": "fulfilment",
+      "value": "AIPT products are digitally fulfilled after payment confirmation; there is no physical shipment or shipping fee. Customer contact/fulfilment uses the checkout phone/WhatsApp workflow.",
+      "source": "artifacts/aipt-store/src/pages/checkout.tsx"
+    },
+    {
+      "id": "catalog_count",
+      "value": "Product counts shown to users must be derived from the current production catalog/API, not a hardcoded marketing number.",
+      "source": "functions/api/[[path]].ts"
+    },
+    {
+      "id": "reviews",
+      "value": "Approved product reviews come from the reviews table. A review is labelled Verified buyer only when it is linked to a matching order.",
+      "source": "functions/api/[[path]].ts"
+    },
+    {
+      "id": "commercial_authorization",
+      "value": "Provider authorization, resale rights, customer-owned procurement, or approved seat rights are never inferred; missing AIPT-specific evidence remains HOLD.",
+      "source": "data/aipt-commercial-evidence.json"
+    },
+    {
+      "id": "refund_delivery_schema",
+      "value": "Structured data must not describe physical returns/shipping for these digital products. Public policy copy must avoid unsupported universal numeric SLA or warranty claims.",
+      "source": "docs/commercial/AIPT_PROVIDER_REVIEW_POLICY.md"
+    }
+  ]
+}

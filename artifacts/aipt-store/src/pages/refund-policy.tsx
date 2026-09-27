@@ -6,9 +6,8 @@ import { SITE_URL as ORIGIN } from "@/config/site";
 export default function RefundPolicy() {
   useSeo({
     title: "Refund & Replacement Policy — AIPT",
-    description:
-      "AIPT offers a 30-day free replacement on every subscription and a full refund if we cannot deliver within 24 hours of payment. Read our complete refund and replacement policy.",
-    keywords: "AIPT refund policy, AI subscription replacement Bangladesh, 30-day warranty",
+    description: "AIPT handles refund and replacement requests for digital orders based on delivery status, product accuracy, access circumstances, and the specific order facts.",
+    keywords: "AIPT refund policy, AI subscription replacement Bangladesh, digital order support",
     canonical: `${ORIGIN}/refund-policy`,
     jsonLd: [
       {
@@ -18,15 +17,6 @@ export default function RefundPolicy() {
         url: `${ORIGIN}/refund-policy`,
         inLanguage: ["en", "bn"],
         about: { "@type": "Thing", name: "Refund and replacement policy for digital subscriptions" },
-      },
-      {
-        "@context": "https://schema.org",
-        "@type": "MerchantReturnPolicy",
-        applicableCountry: "BD",
-        returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
-        merchantReturnDays: 30,
-        returnFees: "https://schema.org/FreeReturn",
-        url: `${ORIGIN}/refund-policy`,
       },
       {
         "@context": "https://schema.org",
@@ -42,53 +32,36 @@ export default function RefundPolicy() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-10 md:py-14">
       <div className="flex items-center gap-3 mb-6">
-        <div className="h-12 w-12 rounded-xl flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg, hsl(262 83% 58%), hsl(220 90% 60%))" }}>
-          <ShieldCheck className="h-6 w-6" />
-        </div>
+        <div className="h-12 w-12 rounded-xl flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg, hsl(262 83% 58%), hsl(220 90% 60%))" }}><ShieldCheck className="h-6 w-6" /></div>
         <h1 className="text-3xl md:text-4xl font-black" style={{ fontFamily: "Outfit, sans-serif" }}>Refund &amp; Replacement Policy</h1>
       </div>
 
       <Card>
         <CardContent className="p-6 md:p-8 space-y-5 text-sm md:text-base leading-relaxed">
           <section>
-            <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>30-day free replacement</h2>
-            <p className="text-muted-foreground">
-              Every AIPT subscription is covered by a 30-day free replacement warranty starting from the day your credentials are delivered. If your account stops working at any point during the warranty window — login failure, suspension, password reset, etc. — message us on WhatsApp with your order ID and we will replace it free of charge, typically within 2 hours.
-            </p>
+            <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>Digital-order policy</h2>
+            <p className="text-muted-foreground">AIPT sells digitally fulfilled products, so ordinary physical return-by-mail rules do not apply. Requests are reviewed against the order record, payment status, product delivered, and the issue reported.</p>
           </section>
-
           <section>
-            <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>Full refund</h2>
-            <p className="text-muted-foreground">
-              You are entitled to a full refund in BDT, paid back to the same payment method you used, in either of these situations:
-            </p>
-            <ul className="list-disc pl-5 text-muted-foreground space-y-1 mt-2">
-              <li>We are unable to deliver your order within 24 hours of payment confirmation.</li>
-              <li>The product you received is materially different from what was advertised on the product page (wrong tier, wrong duration).</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>Why we prefer replacement over cash refund</h2>
-            <p className="text-muted-foreground">
-              After a successful delivery we offer free replacement instead of a cash refund. This keeps our prices the lowest in Bangladesh — refund processing fees on bKash and Nagad are real costs, and absorbing them on every order would force prices up for everyone.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>What is not covered</h2>
+            <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>When to contact us</h2>
             <ul className="list-disc pl-5 text-muted-foreground space-y-1">
-              <li>Buyer's remorse after the account has been used.</li>
-              <li>Account locks caused by the customer changing the password on a shared plan or violating the tool's own terms of service.</li>
-              <li>Issues with the underlying tool that the vendor resolves (we will help you escalate).</li>
+              <li>Your paid order has not been fulfilled and you need a status or resolution.</li>
+              <li>The delivered product materially differs from the product/tier/duration shown in your order.</li>
+              <li>Access supplied for an order stops working and you need AIPT to review the fulfilment record and available remedy.</li>
+              <li>You believe an order or payment reference was processed incorrectly.</li>
             </ul>
           </section>
-
           <section>
-            <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>How to request a refund or replacement</h2>
-            <p className="text-muted-foreground">
-              Message us on WhatsApp with: (1) your order ID, (2) a screenshot of the issue, and (3) a one-line description. We respond within minutes during 10am–11pm BD time, every day.
-            </p>
+            <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>Resolution</h2>
+            <p className="text-muted-foreground">Depending on the verified circumstances, the available resolution may include corrected fulfilment, replacement, cancellation before fulfilment, or refund. AIPT does not publish a universal replacement duration or automatic cash-refund entitlement that applies to every product and scenario.</p>
+          </section>
+          <section>
+            <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>Customer-caused or provider-side issues</h2>
+            <p className="text-muted-foreground">AIPT may need additional information when an issue results from customer credential changes, provider account restrictions, provider outages, policy enforcement, or use outside the purchased product terms. The outcome depends on the facts and the applicable provider/product conditions.</p>
+          </section>
+          <section>
+            <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>How to request review</h2>
+            <p className="text-muted-foreground">Contact AIPT on WhatsApp with your order ID, payment reference, a screenshot when relevant, and a short description. Do not send passwords or sensitive authentication secrets in support messages.</p>
           </section>
         </CardContent>
       </Card>

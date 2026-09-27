@@ -84,3 +84,8 @@ if (violations.length) {
 }
 
 console.log(`AIPT repository isolation PASS: scanned ${tracked.length} tracked runtime/control file(s); no disallowed cross-unit references detected.`);
+
+// The same canonical pre-deploy/hourly integrity path also enforces material
+// marketing-claim freshness. Keeping both fail-closed checks on this execution
+// path prevents an unsupported public claim from bypassing deploy validation.
+await import('./aipt-claim-truth-guard.mjs');
