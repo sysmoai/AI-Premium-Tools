@@ -10,6 +10,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/commerce-data-integrity-watch.yml'
+      - '.github/monitoring/aipt-commerce-baseline.json'
 
 permissions:
   contents: read
@@ -25,6 +26,9 @@ jobs:
     timeout-minutes: 8
 
     steps:
+      - name: Checkout governed monitoring baseline
+        uses: actions/checkout@v4
+
       - name: Verify catalog, D1-facing APIs and commerce guards
         id: verify
         continue-on-error: true
@@ -35,6 +39,22 @@ jobs:
           import fs from 'node:fs';
 
           const BASE = 'https://aipremium.tools';
+          const BASELINE_PATH = '.github/monitoring/aipt-commerce-baseline.json';
+          const baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
+          const minimumCatalogProducts = Number(baseline.minimum_catalog_products);
+          const minimumActiveProducts = Number(baseline.minimum_active_products);
+          const minimumCategories = Number(baseline.minimum_categories);
+          const expectedSchemaMigration = String(baseline.expected_schema_migration || '');
+
+          if (
+            !Number.isInteger(minimumCatalogProducts) || minimumCatalogProducts < 1 ||
+            !Number.isInteger(minimumActiveProducts) || minimumActiveProducts < 1 ||
+            !Number.isInteger(minimumCategories) || minimumCategories < 1 ||
+            !expectedSchemaMigration
+          ) {
+            throw new Error(`Invalid governed monitoring baseline: ${BASELINE_PATH}`);
+          }
+
           const checks = [];
           const failures = [];
           const ok = (msg) => checks.push(`- ✅ ${msg}`);
@@ -73,14 +93,20 @@ jobs:
             const uniqueIds = new Set(ids);
             const invalidPrices = products.filter((p) => !Number.isFinite(Number(p?.price_bdt)) || Number(p.price_bdt) <= 0);
             const active = products.filter((p) => p?.is_active !== false && Number(p?.is_active ?? 1) !== 0);
-            if (products.length >= 50) ok(`Catalog returned ${products.length} products`);
-            else fail(`Catalog unexpectedly small: ${products.length} products`);
+            if (products.length >= minimumCatalogProducts) {
+              ok(`Catalog returned ${products.length} products (governed minimum ${minimumCatalogProducts})`);
+            } else {
+              fail(`Catalog below governed minimum: ${products.length} < ${minimumCatalogProducts}`);
+            }
             if (uniqueIds.size === products.length) ok('Product IDs are unique');
             else fail('Duplicate or invalid product IDs detected');
             if (invalidPrices.length === 0) ok('All live product prices are positive numbers');
             else fail(`${invalidPrices.length} product(s) have invalid prices`);
-            if (active.length > 0) ok(`${active.length} active product(s) remain available`);
-            else fail('No active products remain');
+            if (active.length >= minimumActiveProducts) {
+              ok(`${active.length} active product(s) remain available (governed minimum ${minimumActiveProducts})`);
+            } else {
+              fail(`Active catalog below governed minimum: ${active.length} < ${minimumActiveProducts}`);
+            }
 
             const sampleIds = [...new Set([
               ids[0],
@@ -99,19 +125,26 @@ jobs:
           }
 
           const categories = await json('/api/categories');
-          if (categories.response.status === 200 && Array.isArray(categories.body) && categories.body.length >= 1) ok(`Categories API returned ${categories.body.length} categor${categories.body.length === 1 ? 'y' : 'ies'}`);
-          else fail(`Categories API invalid: HTTP ${categories.response.status}`);
+          if (
+            categories.response.status === 200 &&
+            Array.isArray(categories.body) &&
+            categories.body.length >= minimumCategories
+          ) {
+            ok(`Categories API returned ${categories.body.length} categories (governed minimum ${minimumCategories})`);
+          } else {
+            fail(`Categories API below governed minimum or invalid: HTTP ${categories.response.status}; count=${Array.isArray(categories.body) ? categories.body.length : 'invalid'}`);
+          }
 
           const schema = await json('/api/db-schema');
           if (
             schema.response.status === 200 &&
             schema.body?.status === 'ok' &&
-            schema.body?.migration === '0002_catalog_media_foundation.sql' &&
+            schema.body?.migration === expectedSchemaMigration &&
             schema.body?.checks?.migrations &&
             schema.body?.checks?.catalog_media_tables &&
             schema.body?.checks?.product_columns
-          ) ok('Production D1 schema matches verified migration 0002');
-          else fail('Production D1 schema health check failed');
+          ) ok(`Production D1 schema matches governed migration ${expectedSchemaMigration}`);
+          else fail(`Production D1 schema health check failed; expected ${expectedSchemaMigration}`);
 
           const missing = await request('/api/products/999999999');
           if (missing.status === 404) ok('Missing-product API returns a real 404');
