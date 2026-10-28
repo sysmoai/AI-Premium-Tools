@@ -87,7 +87,7 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
             Manage your store,<br />grow your impact.
           </h2>
           <p className="text-white/70 text-sm mb-8 leading-relaxed">
-            Monitor orders, manage products, and keep 1000+ students powered by AI tools.
+            Monitor orders, manage products, and keep AIPT customers powered by AI tools.
           </p>
           <div className="space-y-3">
             {FEATURES.map(f => (

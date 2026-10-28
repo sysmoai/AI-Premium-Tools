@@ -20,15 +20,15 @@ const FAQ_GROUPS: Array<{ title: string; items: FaqItem[] }> = [
       },
       {
         q: "How do I place an order?",
-        a: "Add the tools you want to your cart, click checkout, fill in your name and WhatsApp number, choose your payment method, send the payment, and submit your transaction reference. We'll confirm and deliver within 1 hour.",
+        a: "Add the tools you want to your cart, click checkout, fill in your name and WhatsApp number, choose your payment method, send the payment, and submit your transaction reference. We'll verify the payment and confirm the supported activation method.",
       },
       {
         q: "Is it safe to pay before receiving the account?",
-        a: "Yes — AIPT has been operating since 2023 with thousands of successful deliveries. Every order is backed by our 30-day warranty. If we can't deliver within 24 hours, you get a full refund.",
+        a: "AIPT verifies every payment by hand before activation. If an order cannot be activated, contact AIPT with your order ID; the resolution is confirmed from the payment and activation status.",
       },
       {
         q: "Do you accept advance payment from new customers?",
-        a: "Yes. Our reputation is built on consistent delivery and visible reviews. New customers can also start with our lowest-priced shared plans to verify our service before purchasing premium tiers.",
+        a: "Yes. New customers can message AIPT on WhatsApp to confirm the plan, price and activation method before paying.",
       },
     ],
   },
@@ -37,28 +37,28 @@ const FAQ_GROUPS: Array<{ title: string; items: FaqItem[] }> = [
     items: [
       {
         q: "How long does delivery take?",
-        a: "Most orders are delivered within 1 hour of payment confirmation, between 10am and 11pm Bangladesh time. Late-night orders are delivered first thing the following morning.",
+        a: "Timing depends on the provider and the activation method. AIPT confirms the expected timing after payment verification; support runs 10am–11pm Bangladesh time.",
       },
       {
-        q: "How will I receive my login credentials?",
-        a: "Credentials are sent directly to the WhatsApp number you provided at checkout. We never share details over email or SMS for security reasons.",
+        q: "How will I receive my activation details?",
+        a: "Activation details are sent to the WhatsApp number you provided at checkout. We never share them over email or SMS for security reasons.",
       },
       {
         q: "Can I activate the tool on multiple devices?",
-        a: "It depends on the plan. Shared plans are intended for single-device use at a time. Personal/Premium plans allow simultaneous logins on multiple devices. The product page lists which tier you're buying.",
+        a: "It depends on the plan. Personal plans follow the provider's own device and login rules. The product page lists which plan you're buying.",
       },
     ],
   },
   {
-    title: "Warranty & Support",
+    title: "Support",
     items: [
       {
-        q: "What does the 30-day warranty cover?",
-        a: "If your account stops working at any point during the 30-day period — login issues, password changes, suspended access — we replace it free of charge. Just message us on WhatsApp with your order ID.",
+        q: "What support is included?",
+        a: "If access changes during the confirmed service period, message AIPT on WhatsApp with your order ID. We review it against the order and the current provider status before confirming a resolution.",
       },
       {
-        q: "What if my account stops working after 30 days?",
-        a: "Most subscriptions last 30 days, so the warranty covers the full duration. For longer durations or recurring use, you can renew at the same discounted price.",
+        q: "What happens when the service period ends?",
+        a: "Most plans run for 30 days. To continue, renew at the current listed price.",
       },
       {
         q: "Do you offer refunds?",
@@ -75,7 +75,7 @@ const FAQ_GROUPS: Array<{ title: string; items: FaqItem[] }> = [
     items: [
       {
         q: "Can I change the password on my account?",
-        a: "For shared plans, please don't — it will lock other users out and void your warranty. For personal plans, you can fully customize the credentials after activation.",
+        a: "Personal plans belong to your own account, so you manage its password and security settings. AIPT does not offer credential-sharing plans.",
       },
       {
         q: "Will I get notified before my subscription expires?",
@@ -92,11 +92,11 @@ const FAQ_GROUPS: Array<{ title: string; items: FaqItem[] }> = [
     items: [
       {
         q: "bKash দিয়ে ChatGPT Plus কিনতে পারব?",
-        a: "জি — AIPT তে bKash, Nagad, Rocket, Upay এবং bank transfer accept করি। Order place করুন, payment send করুন, ১ ঘণ্টার মধ্যে WhatsApp এ login পেয়ে যাবেন।",
+        a: "জি — AIPT তে bKash, Nagad, Rocket, Upay এবং bank transfer accept করি। Order place করুন, payment send করুন, payment যাচাইয়ের পর WhatsApp এ activation-এর পদ্ধতি জানিয়ে দেব।",
       },
       {
         q: "Account renew হচ্ছে না, কী করব?",
-        a: "WhatsApp এ আপনার order ID ও screenshot পাঠান। আমরা ২ ঘণ্টার মধ্যে renewal বা cancel করে দিই — এটা আমাদের warranty এর অংশ।",
+        a: "WhatsApp এ আপনার order ID ও screenshot পাঠান। আমরা order যাচাই করে renewal বা cancel-এর বিষয়ে জানাব।",
       },
       {
         q: "Bangla support আছে?",
@@ -104,7 +104,7 @@ const FAQ_GROUPS: Array<{ title: string; items: FaqItem[] }> = [
       },
       {
         q: "Account কি genuine? Cracked না তো?",
-        a: "প্রতিটি account official source থেকে আসে — কোনো cracked / hacked account না। সেজন্যই ৩০ দিনের replacement warranty দিতে পারি। কাজ না করলে free replace।",
+        a: "AIPT কোনো cracked / hacked access বিক্রি করে না। শুধু বর্তমান pricing ও provider-এর নিয়ম মেনে চলা plan checkout-এ থাকে। সমস্যা হলে order ID দিয়ে যোগাযোগ করুন।",
       },
       {
         q: "Job seeker হিসেবে কোন bundle ভালো?",
@@ -136,7 +136,7 @@ export default function Faq() {
 
   useSeo({
     title: "FAQ — AI Subscriptions in Bangladesh | AIPT",
-    description: "Answers to common questions about ordering, payment, delivery, warranty and support for premium AI subscriptions at AIPT.",
+    description: "Answers to common questions about ordering, payment, delivery and support for premium AI subscriptions at AIPT.",
     keywords: "AIPT FAQ, AI subscription Bangladesh FAQ, bKash AI questions, ChatGPT delivery Bangladesh",
     type: "website",
     jsonLd: [
