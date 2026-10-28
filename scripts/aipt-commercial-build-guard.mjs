@@ -127,8 +127,8 @@ function sanitizeSource() {
 
 function auditOutput() {
   const dist = path.join(storeRoot, 'dist', 'public');
-  const files = walk(dist, (p) => /\.(?:html|js)$/i.test(p));
-  if (files.length === 0) throw new Error('AIPT commercial output audit: no built HTML/JS files found');
+  const files = walk(dist, (p) => /\.(?:html|js|txt)$/i.test(p));
+  if (files.length === 0) throw new Error('AIPT commercial output audit: no built HTML/JS/TXT files found');
 
   const banned = [
     /Bangladesh's #1/i,
@@ -147,6 +147,19 @@ function auditOutput() {
     /Got my Midjourney within 40 minutes/i,
     /ChatGPT Plus at this price is unbeatable/i,
     /Tried two other sellers before AIPT/i,
+    /Trusted by 1,000\+/i,
+    /1000\+ students/i,
+    /1-hour delivery/i,
+    /Access in 1 Hour/i,
+    /activated in 1 hour/i,
+    /within 1 hour/i,
+    /access credentials via WhatsApp/i,
+    /Free swap during warranty/i,
+    /lock other users out/i,
+    /30-day replacement warranty/i,
+    /lowest-priced shared plans/i,
+    /১ ঘণ্টার মধ্যে/,
+    /৩০ দিনের replacement warranty/,
   ];
 
   const violations = [];
