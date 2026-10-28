@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { SITE_URL } from "@/config/site";
 
 export interface SeoOptions {
   title: string;
@@ -35,6 +36,13 @@ function setLink(rel: string, href: string) {
 
 const JSON_LD_ID = "aipt-jsonld";
 
+// Canonical form: apex host, no query string, no trailing slash. Must match
+// functions/lib/seo-routing.ts so the client never overwrites the server tag.
+function canonicalUrl(): string {
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  return `${SITE_URL}${path}`;
+}
+
 export function useSeo({ title, description, image, type = "website", canonical, jsonLd, keywords, noindex }: SeoOptions) {
   useEffect(() => {
     const fullTitle = title.includes("AIPT") ? title : `${title} | ${SITE_NAME}`;
@@ -60,7 +68,7 @@ export function useSeo({ title, description, image, type = "website", canonical,
     setMeta('meta[property="og:site_name"]', "property", "og:site_name", SITE_NAME);
     if (description) setMeta('meta[property="og:description"]', "property", "og:description", description);
     if (image) setMeta('meta[property="og:image"]', "property", "og:image", image);
-    setMeta('meta[property="og:url"]', "property", "og:url", window.location.href);
+    setMeta('meta[property="og:url"]', "property", "og:url", canonical ?? canonicalUrl());
 
     // Twitter
     setMeta('meta[name="twitter:card"]', "name", "twitter:card", image ? "summary_large_image" : "summary");
@@ -69,7 +77,7 @@ export function useSeo({ title, description, image, type = "website", canonical,
     if (image) setMeta('meta[name="twitter:image"]', "name", "twitter:image", image);
 
     // Canonical
-    setLink("canonical", canonical ?? window.location.href);
+    setLink("canonical", canonical ?? canonicalUrl());
 
     // JSON-LD
     let script = document.getElementById(JSON_LD_ID) as HTMLScriptElement | null;

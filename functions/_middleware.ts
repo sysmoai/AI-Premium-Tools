@@ -3,6 +3,7 @@ import {
   findCommercialRule,
   isCommerciallyValidProduct,
 } from "./lib/commercial-policy";
+import { handlePageRequest } from "./lib/seo-routing";
 
 interface Env {
   DB: D1Database;
@@ -289,7 +290,7 @@ async function governedOrderCreate(context: EventContext<Env, string, unknown>):
 export const onRequest: PagesFunction<Env> = async (context) => {
   const url = new URL(context.request.url);
   const isApi = url.pathname === "/api" || url.pathname.startsWith("/api/");
-  if (!isApi) return context.next();
+  if (!isApi) return handlePageRequest(context.request, context.env.DB, () => context.next());
 
   const configPresent = adminConfigPresent(context.env);
   const hasAuthorization = context.request.headers.has("authorization");
