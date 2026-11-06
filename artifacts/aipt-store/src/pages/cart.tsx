@@ -272,7 +272,7 @@ export default function Cart({ items, total, onRemove, onUpdateQuantity }: CartP
                 <span>Total</span>
                 <span className="text-primary" data-testid="text-cart-total">৳{total.toLocaleString()}</span>
               </div>
-              <p className="text-xs text-muted-foreground mb-6">Delivered within 1 hour of payment confirmation</p>
+              <p className="text-xs text-muted-foreground mb-6">Activation method confirmed after payment verification</p>
 
               <Link href="/checkout">
                 <Button className="w-full h-12 font-bold rounded-lg shadow-md" data-testid="btn-checkout">

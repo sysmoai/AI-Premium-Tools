@@ -32,13 +32,13 @@ const STATUS_META: Record<string, { label: string; color: string; Icon: typeof C
     label: "Payment confirmed — preparing your account",
     color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
     Icon: AlertCircle,
-    desc: "Payment confirmed! Your account credentials will be delivered to your WhatsApp within 1 hour.",
+    desc: "Payment confirmed! AIPT will share the supported activation details on WhatsApp.",
   },
   delivered: {
     label: "Delivered",
     color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
     Icon: CheckCircle,
-    desc: "Your order has been delivered. Check your WhatsApp for login credentials. Enjoy!",
+    desc: "Your order has been delivered. Check your WhatsApp for activation details.",
   },
   cancelled: {
     label: "Cancelled",
@@ -253,7 +253,7 @@ export default function TrackOrder() {
                   {
                     Icon: CheckCircle,
                     title: "Delivered to WhatsApp",
-                    desc: "Login credentials sent — usually within 1 hour. 30-day replacement warranty kicks in.",
+                    desc: "Activation details shared on WhatsApp. Contact AIPT with your order ID if access changes.",
                     tone: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
                   },
                 ].map((s, i, arr) => (

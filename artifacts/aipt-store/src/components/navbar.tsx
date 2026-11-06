@@ -27,10 +27,10 @@ interface NavbarProps {
 }
 
 const ANNOUNCEMENTS = [
-  { icon: ShieldCheck, text: "30-day warranty on every order" },
-  { icon: Clock, text: "Activation within 1 hour after payment" },
+  { icon: ShieldCheck, text: "Order-linked support on WhatsApp" },
+  { icon: Clock, text: "Activation method confirmed after payment" },
   { icon: Wallet, text: "bKash · Nagad · Rocket · Bank Transfer" },
-  { icon: Sparkles, text: "Trusted by 1,000+ Bangladeshi students & freelancers" },
+  { icon: Sparkles, text: "Selected AI subscriptions with BDT pricing" },
 ];
 
 export default function Navbar({ cartCount }: NavbarProps) {

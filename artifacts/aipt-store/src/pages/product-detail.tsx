@@ -509,7 +509,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
                 </TabsTrigger>
                 <TabsTrigger value="warranty" data-testid="tab-warranty">
                   <ShieldCheck className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
-                  Warranty
+                  Support
                 </TabsTrigger>
                 <TabsTrigger value="faq" data-testid="tab-faq">
                   <HelpCircle className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />

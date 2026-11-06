@@ -23,9 +23,9 @@ import { WHATSAPP_URL, WHATSAPP_HOURS } from "@/config/contact";
 import { useListCategories } from "@workspace/api-client-react";
 
 const TRUST_BADGES = [
-  { icon: ShieldCheck, title: "30-Day Warranty", subtitle: "Account replaced if anything fails" },
-  { icon: Truck, title: "1-Hour Activation", subtitle: "Delivered after payment confirmation" },
-  { icon: RefreshCw, title: "Easy Replacement", subtitle: "Free swap during warranty period" },
+  { icon: ShieldCheck, title: "Support Included", subtitle: "Issue review via WhatsApp" },
+  { icon: Truck, title: "Activation Support", subtitle: "Method confirmed after payment" },
+  { icon: RefreshCw, title: "Order-linked Support", subtitle: "Resolution based on order and provider status" },
   { icon: Lock, title: "Safe Payments", subtitle: "bKash · Nagad · Rocket · Bank" },
 ];
 

@@ -62,8 +62,8 @@ export default function Products({ onAddToCart }: ProductsProps) {
         ? `${activeCat.name} — AI Tools in Bangladesh`
         : "All AI Tools — Affordable Premium Subscriptions in Bangladesh",
     description: activeCat
-      ? `Browse ${activeCat.name} tools at AIPT — Bangladesh's most affordable store for premium AI subscriptions. Pay in BDT via bKash, Nagad or bank.`
-      : `${totalCount}+ premium AI tools at student-friendly prices. ChatGPT, Claude, Midjourney, Canva Pro and more — paid in BDT, activated in 1 hour.`,
+      ? `Browse ${activeCat.name} tools at AIPT — selected premium AI subscriptions with BDT pricing. Pay in BDT via bKash, Nagad or bank.`
+      : `${totalCount}+ premium AI tools at student-friendly prices. ChatGPT, Claude, Midjourney, Canva Pro and more — paid in BDT with supported activation.`,
     keywords: "AI tools Bangladesh, premium AI subscriptions, ChatGPT BDT, Claude BDT, Midjourney BDT, bKash AI",
     type: "website",
     jsonLd: [
@@ -288,7 +288,7 @@ export default function Products({ onAddToCart }: ProductsProps) {
                   {/* Trust row — replaces the previous synthetic rating display */}
                   <div className="flex items-center gap-2 mb-2 text-xs">
                     <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-medium">
-                      <ShieldCheck className="h-3 w-3" /> 30-day warranty
+                      <ShieldCheck className="h-3 w-3" /> Order-linked support
                     </span>
                     <span className="ml-auto inline-flex items-center gap-0.5 text-green-600 font-medium">
                       <Zap className="h-3 w-3" /> 1-hr activation

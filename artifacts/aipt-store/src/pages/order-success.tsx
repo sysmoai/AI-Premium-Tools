@@ -27,7 +27,7 @@ export default function OrderSuccess() {
 
   useSeo({
     title: id ? `Order #${id} Confirmed — AIPT` : "Order Confirmed — AIPT",
-    description: "Thank you for your order at AIPT. Your AI subscription will be activated within 1 hour.",
+    description: "Thank you for your order at AIPT. We will verify your payment and confirm the supported activation method.",
     type: "website",
   });
 
@@ -48,8 +48,8 @@ export default function OrderSuccess() {
     },
     {
       icon: <MessageCircle className="h-5 w-5 text-green-600" />,
-      time: "Within 1 hour",
-      desc: "You receive access credentials via WhatsApp",
+      time: "After verification",
+      desc: "AIPT confirms activation details via WhatsApp",
       color: "border-green-200 dark:border-green-900",
       bg: "bg-green-50 dark:bg-green-950/30",
     },
@@ -90,7 +90,7 @@ export default function OrderSuccess() {
       <div className="mb-2 text-3xl">🎉</div>
       <h1 className="text-4xl font-black mb-3" style={{ fontFamily: "Outfit, sans-serif" }}>Order Placed!</h1>
       <p className="text-muted-foreground text-lg mb-10">
-        Thank you! We'll verify your payment and deliver your AI tools within 1 hour.
+        Thank you! We'll verify your payment and confirm the supported activation method on WhatsApp.
       </p>
 
       {/* Order details */}
