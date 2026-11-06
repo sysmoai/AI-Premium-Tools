@@ -6,16 +6,11 @@ Disallow: /checkout
 Disallow: /cart
 Disallow: /order-success/
 
-# AI / LLM crawlers — explicitly allowed for indexable content,
-# but sensitive paths repeated so per-agent groups don't override them.
-User-agent: GPTBot
-Allow: /
-Disallow: /admin
-Disallow: /admin/
-Disallow: /checkout
-Disallow: /cart
-Disallow: /order-success/
-
+# AI search / answer agents — allowed for indexable content, sensitive paths
+# repeated so per-agent groups don't override them. Training crawlers
+# (GPTBot, ClaudeBot, Claude-Web, Google-Extended, CCBot, ...) are disallowed
+# by the Cloudflare managed block prepended at the edge (ai-train=no); they are
+# deliberately not re-allowed here, which previously contradicted that block.
 User-agent: OAI-SearchBot
 Allow: /
 Disallow: /admin
@@ -32,39 +27,7 @@ Disallow: /checkout
 Disallow: /cart
 Disallow: /order-success/
 
-User-agent: ClaudeBot
-Allow: /
-Disallow: /admin
-Disallow: /admin/
-Disallow: /checkout
-Disallow: /cart
-Disallow: /order-success/
-
-User-agent: Claude-Web
-Allow: /
-Disallow: /admin
-Disallow: /admin/
-Disallow: /checkout
-Disallow: /cart
-Disallow: /order-success/
-
 User-agent: PerplexityBot
-Allow: /
-Disallow: /admin
-Disallow: /admin/
-Disallow: /checkout
-Disallow: /cart
-Disallow: /order-success/
-
-User-agent: Google-Extended
-Allow: /
-Disallow: /admin
-Disallow: /admin/
-Disallow: /checkout
-Disallow: /cart
-Disallow: /order-success/
-
-User-agent: CCBot
 Allow: /
 Disallow: /admin
 Disallow: /admin/
