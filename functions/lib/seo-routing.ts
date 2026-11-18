@@ -119,7 +119,9 @@ async function resolvePage(db: D1Database, pathname: string): Promise<Resolved> 
   const known = STATIC_PAGES[pathname];
   if (known) return { status: 200, meta: known, canonicalPath: known.index ? pathname : null };
 
-  const product = /^\/products\/(\d+)$/.exec(pathname);
+  // Only the canonical decimal form (no leading zeros) is a product URL;
+  // /products/01 etc. are 404 so they can never become duplicate indexable URLs.
+  const product = /^\/products\/([1-9]\d{0,9})$/.exec(pathname);
   if (product) {
     const row = await loadSellableProduct(db, Number(product[1]));
     if (!row) return { status: 404, meta: NOT_FOUND_META, canonicalPath: null };
@@ -131,7 +133,7 @@ async function resolvePage(db: D1Database, pathname: string): Promise<Resolved> 
         description: `${row.name} from AIPT with current BDT pricing and provider-compatible activation support.`,
         index: true,
       },
-      canonicalPath: pathname,
+      canonicalPath: `/products/${row.id}`,
     };
   }
 
@@ -192,6 +194,28 @@ async function sitemap(db: D1Database): Promise<Response> {
   });
 }
 
+/**
+ * What a product page returns while D1 is unreachable (only product routes
+ * query D1, so this never affects static pages).
+ *
+ * `shell` is the untouched SPA index.html (status 200, default index,follow
+ * meta, no canonical). Return the Response crawlers and shoppers should get.
+ *
+ * 503 + Retry-After + noindex: search engines treat it as temporary and keep the
+ * existing index entry; a missing product (D1 reachable, no row) stays a 404.
+ */
+export function d1OutageResponse(shell: Response): Response {
+  // Decision (CEO directive V3): a product lookup that failed for infrastructure
+  // reasons is a temporary error (503), never a "found" page and never a 404.
+  // noindex + no-store keep crawlers/CDNs from recording or caching it; the SPA
+  // body is kept so shoppers still see the storefront shell.
+  const headers = new Headers(shell.headers);
+  headers.set("retry-after", "60");
+  headers.set("cache-control", "no-store");
+  headers.set("x-robots-tag", "noindex");
+  return new Response(shell.body, { status: 503, headers });
+}
+
 export async function handlePageRequest(
   request: Request,
   db: D1Database,
@@ -207,7 +231,8 @@ export async function handlePageRequest(
   if (url.pathname === "/sitemap.xml") {
     try {
       return await sitemap(db);
-    } catch {
+    } catch (err) {
+      console.error("[aipt-seo] sitemap D1 query failed; serving static sitemap", err);
       return next(); // static public/sitemap.xml fallback
     }
   }
@@ -229,8 +254,9 @@ export async function handlePageRequest(
   let resolved: Resolved;
   try {
     resolved = await resolvePage(db, url.pathname);
-  } catch {
-    return next(); // never take the storefront down because D1 is unavailable
+  } catch (err) {
+    console.error("[aipt-seo] page resolution failed (D1)", url.pathname, err);
+    return d1OutageResponse(await next());
   }
 
   const response = await next();
