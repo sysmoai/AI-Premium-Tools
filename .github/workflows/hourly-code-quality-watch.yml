@@ -53,6 +53,10 @@ jobs:
         continue-on-error: true
         # Reads every branch's workflow files as data; never executes them.
         run: node scripts/aipt-branch-workflow-audit.mjs
+        env:
+          # Deleted from repository scope on 2026-11-19 (#302). Only these names
+          # are downgraded; any other secret on an unbound write workflow stays HIGH.
+          AIPT_RETIRED_REPO_SECRETS: 'CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID'
 
       - name: Install dependencies
         id: install

@@ -17,9 +17,10 @@
 // Exit 1 on CRITICAL or HIGH. Requires a full fetch (actions/checkout
 // fetch-depth: 0) so refs/remotes/origin/* exist.
 //
-// AIPT_REPO_SECRETS_RETIRED=true: set once the repository-level Cloudflare
-// secrets are deleted (credentials only in the Production environment). Then
-// unbound secret use on a branch can no longer receive a value, so it is WARN.
+// AIPT_RETIRED_REPO_SECRETS=NAME1,NAME2: repository-level secret names that
+// have been deleted. An unbound secret+write workflow is downgraded to WARN only
+// when EVERY secret it references is in this list; any other secret name keeps
+// it HIGH. (Fail-closed: an empty/unset list downgrades nothing.)
 
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -39,7 +40,9 @@ const WRITES = [
   ['cache-purge', /purge_cache/],
   ['dns', /dns_records/],
 ];
-const reposecretsRetired = process.env.AIPT_REPO_SECRETS_RETIRED === 'true';
+const retiredSecrets = new Set(
+  (process.env.AIPT_RETIRED_REPO_SECRETS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+);
 
 function workflowBlobs(ref) {
   let out = '';
@@ -70,7 +73,10 @@ function analyse(text) {
   let severity = null;
   if (foreign && (secrets.length || writes.length)) severity = 'CRITICAL';
   else if (prt && secrets.length) severity = 'HIGH';
-  else if (secrets.length && writes.length && !envBound) severity = reposecretsRetired ? 'WARN' : 'HIGH';
+  else if (secrets.length && writes.length && !envBound) {
+    const allRetired = secrets.every((s) => retiredSecrets.has(s));
+    severity = allRetired ? 'WARN' : 'HIGH';
+  }
   else if (secrets.length) severity = 'WARN';
   return { on, secrets, writes, foreign, envBound, severity };
 }
@@ -103,7 +109,7 @@ for (const f of findings) counts[f.severity] += 1;
 const lines = [
   '## AIPT branch-aware workflow audit',
   '',
-  `Branches scanned (excluding main): ${refs.length}. Repository-level secrets retired: ${reposecretsRetired}.`,
+  `Branches scanned (excluding main): ${refs.length}. Retired repository secrets: ${[...retiredSecrets].join(', ') || 'none'}.`,
   `CRITICAL ${counts.CRITICAL} · HIGH ${counts.HIGH} · WARN ${counts.WARN}`,
   '',
 ];
