@@ -96,7 +96,7 @@ export default function Checkout({ items, total, onClearCart }: CheckoutProps) {
               Nothing to check out yet
             </h2>
             <p className="text-muted-foreground text-base max-w-md mx-auto mb-8 leading-relaxed">
-              Your cart is empty. Browse our premium AI subscriptions — pay in BDT and get access on WhatsApp within 1 hour.
+              Your cart is empty. Browse our premium AI subscriptions — pay in BDT and AIPT confirms the supported activation method after payment verification.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Link href="/products">
@@ -116,8 +116,8 @@ export default function Checkout({ items, total, onClearCart }: CheckoutProps) {
             </div>
             <div className="mt-10 grid grid-cols-3 gap-4 max-w-md mx-auto pt-8 border-t border-border">
               {[
-                { v: "1 hr", l: "Activation" },
-                { v: "30-day", l: "Warranty" },
+                { v: "WhatsApp", l: "Support" },
+                { v: "Order ID", l: "Issue review" },
                 { v: "BDT", l: "bKash · Nagad" },
               ].map(s => (
                 <div key={s.l} className="text-center">

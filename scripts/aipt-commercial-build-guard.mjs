@@ -127,8 +127,9 @@ function sanitizeSource() {
 
 function auditOutput() {
   const dist = path.join(storeRoot, 'dist', 'public');
-  const files = walk(dist, (p) => /\.(?:html|js)$/i.test(p));
-  if (files.length === 0) throw new Error('AIPT commercial output audit: no built HTML/JS files found');
+  // .json/.webmanifest included: the PWA manifest is customer-visible metadata.
+  const files = walk(dist, (p) => /\.(?:html|js|txt|json|webmanifest)$/i.test(p));
+  if (files.length === 0) throw new Error('AIPT commercial output audit: no built HTML/JS/TXT files found');
 
   const banned = [
     /Bangladesh's #1/i,
@@ -147,21 +148,66 @@ function auditOutput() {
     /Got my Midjourney within 40 minutes/i,
     /ChatGPT Plus at this price is unbeatable/i,
     /Tried two other sellers before AIPT/i,
+    /Trusted by 1,000\+/i,
+    /1000\+ students/i,
+    /1-hour delivery/i,
+    /Access in 1 Hour/i,
+    /activated in 1 hour/i,
+    /within 1 hour/i,
+    /access credentials via WhatsApp/i,
+    /Free swap during warranty/i,
+    /lock other users out/i,
+    /30-day replacement warranty/i,
+    /lowest-priced shared plans/i,
+    /১ ঘণ্টার মধ্যে/,
+    /৩০ দিনের replacement warranty/,
   ];
 
+  // Semantic families: catch reworded variants of the same unsupported claim,
+  // not only the exact phrases above. Each match is reported with context.
+  const semantic = [
+    ['delivery/activation time promise', /\b(?:within|in|under)\s+(?:an?\s+|one\s+|\d+\s*[-–]?\s*)(?:min(?:ute)?s?|hours?|hrs?)\b(?=[^."]{0,60}\b(?:deliver|activat|access|login|credential|verif))|\b(?:deliver|activat|access|verif)\w*[^."]{0,40}\b(?:within|in|under)\s+(?:an?\s+|one\s+|\d+\s*[-–]?\s*)(?:min(?:ute)?s?|hours?|hrs?)\b|\b\d+\s*[-–]?\s*(?:hour|hr|minute|min)s?\s+(?:delivery|activation|access)\b|\b(?:instant|same[- ]day)\s+(?:delivery|activation|access)\b|\bWithin\s+\d+\s*min\b/i],
+    ['warranty/refund/replacement guarantee', /\b\d+[- ]day\s+(?:free\s+)?(?:replacement|warranty)\b|\breplacement\s+warranty\b|\bmoney[- ]back\b|\bfull refund\b|\bfree replacement\b|\bvoids? your warranty\b/i],
+    ['customer count / rating claim', /\b\d[\d,.]*\s*\+\s*(?:happy\s+)?(?:customers|students|users|clients|orders|deliveries)\b|\b[34]\.\d\s*\/\s*5\b|\bthousands of (?:customers|deliveries|orders)\b/i],
+    ['shared-plan entitlement', /\bshared\s+(?:seat|plan|account|access|login|subscription)s?\b|\bpremium shared\b|\blocks? other users out\b/i],
+    ['official/authorized relationship', /\b(?:official|authori[sz]ed)\s+(?:partner|reseller|distributor|seller)\b|\bfrom official channels\b|\bgenuine subscription\b/i],
+    ['unverified superlative', /\b(?:Bangladesh's\s+#\s?1|number one store|cheapest|most affordable|lowest prices?|unbeatable)\b/i],
+    ['absolute security claim', /\b100\s*%\s*(?:safe|secure|legit|genuine|guaranteed)\b|\bnever (?:get )?(?:banned|blocked)\b/i],
+    ['Bangla time/warranty/shared claim', /ঘণ্টা(?:র)?\s*(?:মধ্যে|ভিতরে)|ওয়ারেন্টি|গ্যারান্টি|শেয়ার(?:্ড)?\s*(?:অ্যাকাউন্ট|প্ল্যান)/],
+  ];
+  // Legal/policy pages carry refund and warranty terms that need an explicit
+  // owner/legal decision before rewording. They are reported loudly, never
+  // silently passed, and never blocked here (rewording them is a policy change).
+  const pendingLegalReview = /(?:^|[\\/])(?:refund-policy|shipping-policy|terms|privacy-policy)-[A-Za-z0-9_-]+\.js$/;
+
   const violations = [];
+  const pending = [];
   for (const file of files) {
     const text = fs.readFileSync(file, 'utf8');
+    const rel = path.relative(repoRoot, file);
     for (const rx of banned) {
-      if (rx.test(text)) violations.push(`${path.relative(repoRoot, file)} :: ${rx}`);
+      if (rx.test(text)) violations.push(`${rel} :: ${rx}`);
     }
+    for (const [family, rx] of semantic) {
+      const m = text.match(rx);
+      if (!m) continue;
+      const at = Math.max(0, (m.index ?? 0) - 50);
+      const context = text.slice(at, (m.index ?? 0) + m[0].length + 50).replace(/\s+/g, ' ');
+      const entry = `${rel} :: ${family} :: "${m[0]}" … ${context}`;
+      if (pendingLegalReview.test(file)) pending.push(entry);
+      else violations.push(entry);
+    }
+  }
+  if (pending.length) {
+    console.warn(`[aipt-commercial-guard] PENDING_LEGAL_REVIEW — ${pending.length} claim(s) on legal/policy pages need an owner/legal decision:`);
+    for (const p of pending) console.warn(`- ${p}`);
   }
   if (violations.length) {
     console.error('AIPT commercial output audit blocked unsupported claims:');
     for (const v of violations) console.error(`- ${v}`);
     process.exit(1);
   }
-  console.log(`[aipt-commercial-guard] output PASS — ${files.length} built HTML/JS file(s), revision aipt-pricing-v2-2026-09-17`);
+  console.log(`[aipt-commercial-guard] output PASS — ${files.length} built file(s), revision aipt-pricing-v2-2026-09-17${pending.length ? `, ${pending.length} legal-page claim(s) pending review` : ''}`);
 }
 
 if (mode === 'pre') sanitizeSource();

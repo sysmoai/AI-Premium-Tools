@@ -275,8 +275,8 @@ export default function Home({ onAddToCart }: HomeProps) {
             <strong>AIPT (AI Premium Tools)</strong> is a Bangladesh-based store for premium AI subscriptions —
             ChatGPT Plus, Claude Pro, Midjourney, Canva Pro, Notion AI, Grammarly Premium and {totalToolsCount}+ more.
             We accept <strong>bKash, Nagad, Rocket, Upay, and bank transfer</strong> in BDT.
-            Most orders are delivered to your WhatsApp within <strong>1 hour</strong>, and every subscription is
-            covered by a <strong>30-day replacement warranty</strong>. AIPT operates daily 10am–11pm Bangladesh time.
+            After payment verification, AIPT confirms the supported activation method and expected timing, and every subscription is
+            supported on WhatsApp using your order ID. AIPT operates daily 10am–11pm Bangladesh time.
           </p>
         </div>
       </section>
@@ -479,7 +479,7 @@ export default function Home({ onAddToCart }: HomeProps) {
             {[
               { icon: <Zap className="h-6 w-6" />, title: "15–20% Lower Prices", desc: "We pass the savings directly to students. Same tools, better price — always." },
               { icon: <Users className="h-6 w-6" />, title: "Student-First Packages", desc: "8 exclusive bundles designed for university life — research, design, writing, and more." },
-              { icon: <Clock className="h-6 w-6" />, title: "Access in 1 Hour", desc: "Pay via bKash, Nagad, or bank transfer. Get your AI tools delivered within 1 hour." },
+              { icon: <Clock className="h-6 w-6" />, title: "Activation Support", desc: "Pay via bKash, Nagad, or bank transfer. AIPT confirms the supported activation method after payment verification." },
             ].map(item => (
               <div key={item.title} className="text-center">
                 <div
