@@ -23,17 +23,15 @@ import { WHATSAPP_URL, WHATSAPP_HOURS } from "@/config/contact";
 import { useListCategories } from "@workspace/api-client-react";
 
 const TRUST_BADGES = [
-  { icon: ShieldCheck, title: "30-Day Warranty", subtitle: "Account replaced if anything fails" },
-  { icon: Truck, title: "1-Hour Activation", subtitle: "Delivered after payment confirmation" },
-  { icon: RefreshCw, title: "Easy Replacement", subtitle: "Free swap during warranty period" },
-  { icon: Lock, title: "Safe Payments", subtitle: "bKash · Nagad · Rocket · Bank" },
+  { icon: ShieldCheck, title: "Seller Clarity", subtitle: "AIPT is the seller and support contact" },
+  { icon: Truck, title: "Digital Fulfilment", subtitle: "Handled after payment confirmation" },
+  { icon: RefreshCw, title: "Order Support", subtitle: "Use your order ID when contacting us" },
+  { icon: Lock, title: "BDT Checkout", subtitle: "bKash · Nagad · Bank" },
 ];
 
 const PAYMENT_METHODS = [
   { name: "bKash", color: "#E2136E" },
   { name: "Nagad", color: "#EC1C24" },
-  { name: "Rocket", color: "#8E2A8B" },
-  { name: "Upay", color: "#F7941D" },
   { name: "Bank", color: "#1E40AF" },
 ];
 
@@ -55,13 +53,14 @@ export default function Footer() {
       toast({ title: "Invalid email", description: "Please enter a valid email address.", variant: "destructive" });
       return;
     }
-    toast({ title: "You're in 🎉", description: `We'll send AI deals to ${email} once a week. No spam.` });
-    setEmail("");
+    toast({
+      title: "Newsletter signup is not active yet",
+      description: "No subscription was created. Please use WhatsApp for current offers or support.",
+    });
   }
 
   return (
     <footer className="mt-20" style={{ position: "relative" }}>
-      {/* Trust badges strip */}
       <div className="border-y border-border bg-muted/40">
         <div className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-2 md:grid-cols-4 gap-6">
           {TRUST_BADGES.map(b => (
@@ -81,7 +80,6 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* Gradient seam */}
       <div
         style={{
           height: "2px",
@@ -92,7 +90,6 @@ export default function Footer() {
       <div className="bg-muted/30">
         <div className="max-w-6xl mx-auto px-4 py-12">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-10 mb-10">
-            {/* Brand + socials + newsletter (4 cols) */}
             <div className="md:col-span-4">
               <div className="flex items-center gap-2.5 mb-3">
                 <div
@@ -118,13 +115,12 @@ export default function Footer() {
                 </div>
               </div>
               <p className="text-muted-foreground text-sm leading-relaxed mb-5">
-                Bangladesh's most affordable store for premium AI subscriptions. We pay the foreign card so students,
-                freelancers and creators here can use ChatGPT, Claude, Midjourney and more — at fair BDT pricing.
+                A Bangladesh-focused seller and support service for digital AI and tool subscriptions. Current product details,
+                prices and availability are published by the live catalog.
               </p>
 
-              {/* Newsletter */}
               <div className="mb-5">
-                <div className="font-semibold text-sm mb-2">Get weekly AI deals & tips</div>
+                <div className="font-semibold text-sm mb-2">Newsletter</div>
                 <form onSubmit={subscribe} className="flex gap-2">
                   <Input
                     type="email"
@@ -139,16 +135,15 @@ export default function Footer() {
                     type="submit"
                     size="icon"
                     className="rounded-full h-10 w-10 shrink-0"
-                    aria-label="Subscribe"
+                    aria-label="Check newsletter availability"
                     data-testid="btn-newsletter-subscribe"
                   >
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                 </form>
-                <div className="text-xs text-muted-foreground mt-1.5">No spam. Unsubscribe any time.</div>
+                <div className="text-xs text-muted-foreground mt-1.5">Signup is not active yet; submitting does not create a subscription.</div>
               </div>
 
-              {/* Socials */}
               <div className="flex items-center gap-2">
                 {SOCIALS.map(s => (
                   <a
@@ -166,7 +161,6 @@ export default function Footer() {
               </div>
             </div>
 
-            {/* Shop (categories) */}
             <div className="md:col-span-3">
               <h3 className="font-bold mb-4">Shop</h3>
               <div className="space-y-2.5 text-sm">
@@ -178,10 +172,7 @@ export default function Footer() {
                 {categories?.slice(0, 7).map(cat => (
                   <div key={cat.id}>
                     <Link href={`/products?category_id=${cat.id}`}>
-                      <span
-                        className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-                        data-testid={`footer-cat-${cat.slug}`}
-                      >
+                      <span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors" data-testid={`footer-cat-${cat.slug}`}>
                         {cat.name}
                       </span>
                     </Link>
@@ -190,42 +181,18 @@ export default function Footer() {
               </div>
             </div>
 
-            {/* Help */}
             <div className="md:col-span-2">
               <h3 className="font-bold mb-4">Help</h3>
               <div className="space-y-2.5 text-sm">
-                <div>
-                  <Link href="/cart">
-                    <span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">Cart</span>
-                  </Link>
-                </div>
-                <div>
-                  <Link href="/track-order">
-                    <span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
-                      Order Tracking
-                    </span>
-                  </Link>
-                </div>
-                <div>
-                  <Link href="/refund-policy"><span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">Refund Policy</span></Link>
-                </div>
-                <div>
-                  <Link href="/faq"><span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">How to Order</span></Link>
-                </div>
-                <div>
-                  <Link href="/faq">
-                    <span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
-                      FAQ
-                    </span>
-                  </Link>
-                </div>
-                <div>
-                  <Link href="/contact"><span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">Become a Reseller</span></Link>
-                </div>
+                <div><Link href="/cart"><span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">Cart</span></Link></div>
+                <div><Link href="/track-order"><span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">Order Tracking</span></Link></div>
+                <div><Link href="/refund-policy"><span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">Refund Policy</span></Link></div>
+                <div><Link href="/shipping-policy"><span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">Delivery Policy</span></Link></div>
+                <div><Link href="/faq"><span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">FAQ</span></Link></div>
+                <div><Link href="/contact"><span className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors">Contact</span></Link></div>
               </div>
             </div>
 
-            {/* Contact */}
             <div className="md:col-span-3">
               <h3 className="font-bold mb-4">Contact</h3>
               <a
@@ -240,48 +207,26 @@ export default function Footer() {
                 Chat on WhatsApp
               </a>
               <div className="space-y-2 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <Phone className="h-3.5 w-3.5 shrink-0" />
-                  <span>{WHATSAPP_HOURS}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-3.5 w-3.5 shrink-0" />
-                  <a href="mailto:admin@aipremium.tools" className="hover:text-foreground transition-colors">admin@aipremium.tools</a>
-                </div>
-                <div className="flex items-start gap-2">
-                  <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                  <span>Dhaka, Bangladesh</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="h-3.5 w-3.5 shrink-0" />
-                  <span>Mon–Sun · 10am – 11pm</span>
-                </div>
+                <div className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 shrink-0" /><span>{WHATSAPP_HOURS}</span></div>
+                <div className="flex items-center gap-2"><Mail className="h-3.5 w-3.5 shrink-0" /><a href="mailto:admin@aipremium.tools" className="hover:text-foreground transition-colors">admin@aipremium.tools</a></div>
+                <div className="flex items-start gap-2"><MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" /><span>Dhaka, Bangladesh</span></div>
+                <div className="flex items-center gap-2"><Clock className="h-3.5 w-3.5 shrink-0" /><span>{WHATSAPP_HOURS}</span></div>
               </div>
             </div>
           </div>
 
-          {/* Payment methods */}
           <div className="border-t border-border pt-6 pb-2 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-sm font-semibold text-muted-foreground">We accept:</span>
+              <span className="text-sm font-semibold text-muted-foreground">Checkout methods:</span>
               {PAYMENT_METHODS.map(p => (
-                <div
-                  key={p.name}
-                  className="px-3 py-1.5 rounded-md text-white text-xs font-bold shadow-sm"
-                  style={{ background: p.color }}
-                  data-testid={`pay-${p.name.toLowerCase()}`}
-                >
+                <div key={p.name} className="px-3 py-1.5 rounded-md text-white text-xs font-bold shadow-sm" style={{ background: p.color }} data-testid={`pay-${p.name.toLowerCase()}`}>
                   {p.name}
                 </div>
               ))}
             </div>
-            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <Lock className="h-3 w-3" />
-              All payments processed securely in BDT
-            </div>
+            <div className="text-xs text-muted-foreground flex items-center gap-1.5"><Lock className="h-3 w-3" />Orders are recorded in BDT</div>
           </div>
 
-          {/* Bottom bar */}
           <div className="border-t border-border mt-6 pt-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
             <div>© {new Date().getFullYear()} AI Premium Tools (AIPT). All rights reserved.</div>
             <div className="flex items-center gap-4">
@@ -291,7 +236,6 @@ export default function Footer() {
               <Link href="/refund-policy" className="hover:text-foreground transition-colors">Refund Policy</Link>
               <Link href="/privacy-policy" className="hover:text-foreground transition-colors">Privacy</Link>
               <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
-              <span className="hidden md:inline">Made with ❤️ in Bangladesh</span>
             </div>
           </div>
         </div>
@@ -299,4 +243,3 @@ export default function Footer() {
     </footer>
   );
 }
-
