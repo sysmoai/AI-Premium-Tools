@@ -53,6 +53,10 @@ jobs:
         continue-on-error: true
         # Reads every branch's workflow files as data; never executes them.
         run: node scripts/aipt-branch-workflow-audit.mjs
+        env:
+          # Repository-level Cloudflare secrets were deleted on 2026-11-19 (#302);
+          # unbound branch workflows can no longer receive a credential value.
+          AIPT_REPO_SECRETS_RETIRED: 'true'
 
       - name: Install dependencies
         id: install
