@@ -62,7 +62,7 @@ const FAQ_GROUPS: Array<{ title: string; items: FaqItem[] }> = [
       },
       {
         q: "Do you offer refunds?",
-        a: "Yes. If we cannot deliver within 24 hours, you receive a full refund. After delivery, we offer free replacement instead of a cash refund — this keeps prices low for everyone.",
+        a: "Order resolution depends on payment status, activation status, and the confirmed service terms. Contact AIPT with the order ID for review before any resolution is promised.",
       },
       {
         q: "How do I contact support?",

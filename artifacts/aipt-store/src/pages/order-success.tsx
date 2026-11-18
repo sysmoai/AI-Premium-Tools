@@ -41,7 +41,7 @@ export default function OrderSuccess() {
   const NEXT_STEPS = [
     {
       icon: <Clock className="h-5 w-5 text-blue-600" />,
-      time: "Within 30 min",
+      time: "First",
       desc: "We verify your payment transaction",
       color: "border-blue-200 dark:border-blue-900",
       bg: "bg-blue-50 dark:bg-blue-950/30",
@@ -55,7 +55,7 @@ export default function OrderSuccess() {
     },
     {
       icon: <Zap className="h-5 w-5 text-violet-600" />,
-      time: "Immediately",
+      time: "After activation",
       desc: "Start using your premium AI tools",
       color: "border-violet-200 dark:border-violet-900",
       bg: "bg-violet-50 dark:bg-violet-950/30",
