@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "approved_on": "2026-09-27",
+  "business": "AIPT",
+  "purpose": "Governed production-watch baselines. Change only through reviewed source control when an intentional catalog or schema change is approved.",
+  "minimum_catalog_products": 25,
+  "minimum_active_products": 25,
+  "minimum_categories": 8,
+  "expected_schema_migration": "0002_catalog_media_foundation.sql"
+}

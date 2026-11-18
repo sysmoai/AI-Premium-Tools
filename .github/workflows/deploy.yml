@@ -2,8 +2,6 @@ name: Validate and Deploy AIPT
 
 on:
   pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 # Default the workflow token to read-only. Production deployment authenticates
@@ -66,10 +64,9 @@ jobs:
           VITE_SITE_URL: 'https://aipremium.tools'
 
   deploy-production:
-    # A manual dispatch from a feature branch must never receive production
-    # deploy credentials or deploy unmerged code. Only the main ref can enter
-    # this job, whether triggered by push or workflow_dispatch.
-    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    # Emergency review-only freeze. No production publish until AIPT owner
+    # separately approves a SHA-pinned, manual release procedure.
+    if: ${{ false }}
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 30
