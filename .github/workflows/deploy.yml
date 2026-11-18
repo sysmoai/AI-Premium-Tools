@@ -68,6 +68,9 @@ jobs:
     # separately approves a SHA-pinned, manual release procedure.
     if: ${{ false }}
     needs: validate
+    # #302: Cloudflare credentials live only in the protected Production
+    # environment (deployment branch policy: main; required reviewer).
+    environment: Production
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
