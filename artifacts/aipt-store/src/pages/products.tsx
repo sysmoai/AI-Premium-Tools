@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { useListProducts, useListCategories } from "@workspace/api-client-react";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
+import { productPath } from "@/lib/product-path";
 import { useSeo } from "@/hooks/use-seo";
 import { SITE_URL } from "@/config/site";
 
@@ -102,7 +103,7 @@ export default function Products({ onAddToCart }: ProductsProps) {
               itemListElement: products.slice(0, 30).map((p, i) => ({
                 "@type": "ListItem",
                 position: i + 1,
-                url: `${ORIGIN}/products/${p.id}`,
+                url: `${ORIGIN}${productPath(p)}`,
                 name: p.name,
               })),
             },
@@ -265,7 +266,7 @@ export default function Products({ onAddToCart }: ProductsProps) {
                 className="group hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 overflow-hidden flex flex-col"
                 data-testid={`card-product-${product.id}`}
               >
-                <Link href={`/products/${product.id}`}>
+                <Link href={productPath(product)}>
                   <div className="cursor-pointer">
                     <ProductLogoBanner
                       name={product.name}
@@ -279,7 +280,7 @@ export default function Products({ onAddToCart }: ProductsProps) {
                 </Link>
 
                 <CardContent className="p-5 flex flex-col flex-1">
-                  <Link href={`/products/${product.id}`}>
+                  <Link href={productPath(product)}>
                     <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors mb-1.5 cursor-pointer">
                       {product.name}
                     </h3>
@@ -324,7 +325,7 @@ export default function Products({ onAddToCart }: ProductsProps) {
                       <div className="text-xs text-muted-foreground">{product.duration_days || 30} days</div>
                     </div>
                     <div className="flex gap-2">
-                      <Link href={`/products/${product.id}`}>
+                      <Link href={productPath(product)}>
                         <Button variant="outline" size="sm" data-testid={`btn-details-${product.id}`}>Details</Button>
                       </Link>
                       <Button

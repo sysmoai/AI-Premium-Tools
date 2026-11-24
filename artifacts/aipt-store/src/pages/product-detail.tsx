@@ -43,6 +43,7 @@ import { useSeo } from "@/hooks/use-seo";
 import { SITE_URL } from "@/config/site";
 import { useRecentlyViewed } from "@/hooks/use-recently-viewed";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
+import { productPath, resolveProductId } from "@/lib/product-path";
 import { ProductMediaGallery } from "@/components/product-media-gallery";
 import { CustomerReviews } from "@/components/customer-reviews";
 import { WHATSAPP_URL } from "@/config/contact";
@@ -114,11 +115,19 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { ids: recentIds, track: trackViewed } = useRecentlyViewed();
-  const productId = Number(id);
 
-  const { data: product, isLoading } = useGetProduct(productId, {
-    query: { enabled: !!id, queryKey: getGetProductQueryKey(productId) },
+  // Route param is a slug or a numeric id; slugs resolve through the catalog list.
+  const allProductsParams = { is_active: true };
+  const { data: allProducts, isLoading: catalogLoading } = useListProducts(allProductsParams, {
+    query: { queryKey: getListProductsQueryKey(allProductsParams) },
   });
+  const resolvedId = resolveProductId(id, allProducts);
+  const productId = resolvedId ?? 0;
+
+  const { data: product, isLoading: productLoading } = useGetProduct(productId, {
+    query: { enabled: resolvedId !== undefined, queryKey: getGetProductQueryKey(productId) },
+  });
+  const isLoading = productLoading || (resolvedId === undefined && catalogLoading);
 
   const relatedParams = { is_active: true, category_id: product?.category_id };
   const { data: relatedAll } = useListProducts(relatedParams, {
@@ -126,11 +135,6 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
       enabled: !!product?.category_id,
       queryKey: getListProductsQueryKey(relatedParams),
     },
-  });
-
-  const allProductsParams = { is_active: true };
-  const { data: allProducts } = useListProducts(allProductsParams, {
-    query: { queryKey: getListProductsQueryKey(allProductsParams) },
   });
 
   // Scroll to top when route changes
@@ -159,7 +163,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
 
   // ─── SEO: per-product meta + Google-2024-compliant Product / Breadcrumb / FAQ JSON-LD ───
   const ORIGIN = typeof window !== "undefined" ? window.location.origin : SITE_URL;
-  const productUrl = product ? `${ORIGIN}/products/${product.id}` : ORIGIN;
+  const productUrl = product ? `${ORIGIN}${productPath(product)}` : ORIGIN;
   const fallbackOg = `${ORIGIN}/opengraph.jpg`;
   const productImage = product?.image_url || fallbackOg;
   const durationDaysSeo = product?.duration_days ?? 30;
@@ -745,7 +749,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
                 const grad = getProductGradient(p.name);
                 const sav = p.original_price_bdt ? Math.round((1 - p.price_bdt / p.original_price_bdt) * 100) : 0;
                 return (
-                  <Link key={p.id} href={`/products/${p.id}`}>
+                  <Link key={p.id} href={productPath(p)}>
                     <Card
                       className="overflow-hidden h-full hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer"
                       data-testid={`related-product-${p.id}`}
@@ -791,7 +795,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
                 const grad = getProductGradient(p.name);
                 const sav = p.original_price_bdt ? Math.round((1 - p.price_bdt / p.original_price_bdt) * 100) : 0;
                 return (
-                  <Link key={p.id} href={`/products/${p.id}`}>
+                  <Link key={p.id} href={productPath(p)}>
                     <Card className="overflow-hidden h-full hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer" data-testid={`pdp-recent-${p.id}`}>
                       <ProductLogoBanner
                         name={p.name}

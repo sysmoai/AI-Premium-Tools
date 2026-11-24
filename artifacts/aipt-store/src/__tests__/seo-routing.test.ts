@@ -3,6 +3,8 @@
 // No network, no D1, no Cloudflare: D1 and HTMLRewriter are in-memory mocks.
 import { test, expect } from "vitest";
 import { handlePageRequest } from "../../../../functions/lib/seo-routing";
+import { AIPT_COMMERCIAL_RULES } from "../../../../functions/lib/commercial-policy";
+import { productPath, resolveProductId } from "../lib/product-path";
 
 // --- HTMLRewriter mock: records handlers, leaves body untouched. -------------
 const rewrites: string[] = [];
@@ -18,6 +20,7 @@ const ROWS: Row[] = [
   { id: 1, name: "ChatGPT Plus — Personal", price_bdt: 3390, is_active: 1, commercial_state: "CUSTOMER_OWNED", category_id: 1, sort_order: 0 },
   { id: 2, name: "ChatGPT Plus — Personal", price_bdt: 999,  is_active: 1, commercial_state: "CUSTOMER_OWNED", category_id: 1, sort_order: 1 }, // wrong price
   { id: 3, name: "ChatGPT Plus Shared Seat", price_bdt: 350, is_active: 1, commercial_state: "HOLD", category_id: 1, sort_order: 2 },       // no rule / HOLD
+  { id: 5, name: "ChatGPT Plus Annual — Personal", price_bdt: 3390, is_active: 1, commercial_state: "CUSTOMER_OWNED", category_id: 1, sort_order: 3 }, // same rule as 1
   { id: 4, name: "Claude Pro — Personal",   price_bdt: 3390, is_active: 0, commercial_state: "CUSTOMER_OWNED", category_id: 2, sort_order: 0 }, // inactive
 ];
 
@@ -61,9 +64,53 @@ test("unknown route → real 404 + noindex", async () => {
   expect(r.headers.get("x-robots-tag")).toBe("noindex");
 });
 
-test("sellable product → 200", async () => {
-  const r = await handlePageRequest(req("/products/1"), mockDb(), nextShell);
+test("sellable product slug → 200 indexable", async () => {
+  const r = await handlePageRequest(req("/products/chatgpt-plus"), mockDb(), nextShell);
   expect(r.status).toBe(200);
+  expect(r.headers.get("x-robots-tag")).toBe(null);
+});
+
+test("numeric product URL → 301 to its slug, keeps query", async () => {
+  const r = await handlePageRequest(req("/products/1?utm_source=x"), mockDb(), nextShell);
+  expect(r.status).toBe(301);
+  expect(r.headers.get("location")).toBe("https://aipremium.tools/products/chatgpt-plus?utm_source=x");
+});
+
+test("second row matching the same rule keeps its numeric URL (never redirected to another product)", async () => {
+  const r = await handlePageRequest(req("/products/5"), mockDb(), nextShell);
+  expect(r.status).toBe(200);
+  expect(r.headers.get("location")).toBe(null);
+});
+
+test("known slug without a sellable product → 404; wrong case → 404", async () => {
+  for (const p of ["/products/claude-pro", "/products/ChatGPT-Plus"]) {
+    const r = await handlePageRequest(req(p), mockDb(), nextShell);
+    expect(r.status, p).toBe(404);
+  }
+});
+
+test("unknown slug never queries D1; known slug during an outage → 503", async () => {
+  expect((await handlePageRequest(req("/products/not-a-plan"), mockDb(true), nextShell)).status).toBe(404);
+  const orig = console.error; console.error = () => {};
+  try {
+    const r = await handlePageRequest(req("/products/chatgpt-plus"), mockDb(true), nextShell);
+    expect(r.status).toBe(503);
+  } finally { console.error = orig; }
+});
+
+test("slugs are unique and cannot be mistaken for numeric ids", () => {
+  const ids = AIPT_COMMERCIAL_RULES.map((rule) => rule.id);
+  expect(new Set(ids).size).toBe(ids.length);
+  for (const id of ids) expect(id).toMatch(/^[a-z][a-z0-9-]*$/);
+});
+
+test("storefront resolves numeric ids and slugs", () => {
+  const products = [{ id: 1, slug: "chatgpt-plus" }, { id: 5 }];
+  expect(resolveProductId("chatgpt-plus", products)).toBe(1);
+  expect(resolveProductId("5", products)).toBe(5);
+  expect(resolveProductId("nope", products)).toBe(undefined);
+  expect(resolveProductId("chatgpt-plus", undefined)).toBe(undefined);
+  expect(products.map(productPath)).toEqual(["/products/chatgpt-plus", "/products/5"]);
 });
 
 for (const [id, why] of [[2, "price mismatch"], [3, "HOLD/shared"], [4, "inactive"], [999, "missing"]] as const) {
@@ -115,7 +162,9 @@ test("sitemap lists static pages + sellable products only", async () => {
   const r = await handlePageRequest(req("/sitemap.xml"), mockDb(), nextShell);
   const xml = await r.text();
   expect(r.headers.get("content-type") ?? "").toMatch(/xml/);
-  expect(xml.includes("https://aipremium.tools/products/1")).toBeTruthy();
+  expect(xml.includes("https://aipremium.tools/products/chatgpt-plus<")).toBeTruthy();
+  expect(xml.includes("https://aipremium.tools/products/5<")).toBeTruthy();
+  expect(xml.includes("/products/1<")).toBe(false);
   for (const id of [2, 3, 4]) expect(!xml.includes(`/products/${id}<`), `product ${id} must not be listed`).toBeTruthy();
   expect(!xml.includes("/cart<") && !xml.includes("/checkout<")).toBeTruthy();
 });

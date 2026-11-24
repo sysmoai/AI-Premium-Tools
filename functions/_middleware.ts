@@ -3,6 +3,7 @@ import {
   findCommercialRule,
   isCommerciallyValidProduct,
 } from "./lib/commercial-policy";
+import { loadSlugOwners, ownedSlug } from "./lib/product-slugs";
 import { handlePageRequest } from "./lib/seo-routing";
 
 interface Env {
@@ -52,7 +53,7 @@ function parseFeatures(value: unknown): unknown {
   }
 }
 
-function toPublicProduct(r: ProductRow) {
+function toPublicProduct(r: ProductRow, slug: string | undefined) {
   return {
     id: r.id,
     name: r.name,
@@ -68,7 +69,7 @@ function toPublicProduct(r: ProductRow) {
     is_featured: !!r.is_featured,
     stock_count: r.stock_count,
     order_count: r.order_count,
-    slug: r.slug ?? undefined,
+    slug,
     plan_type: r.plan_type ?? undefined,
     delivery_type: r.delivery_type ?? undefined,
     commercial_state: r.commercial_state,
@@ -113,9 +114,11 @@ async function governedProductList(env: Env, url: URL): Promise<Response> {
     .bind(...params)
     .all<ProductRow>();
 
+  // Ownership is computed over the whole catalog, not the filtered page.
+  const owners = await loadSlugOwners(env.DB);
   const safe = (rows.results ?? [])
     .filter((row) => isCommerciallyValidProduct(row))
-    .map(toPublicProduct);
+    .map((row) => toPublicProduct(row, ownedSlug(row, owners)));
   return json(safe);
 }
 
@@ -133,7 +136,7 @@ async function governedProductDetail(env: Env, pathname: string): Promise<Respon
     .bind(id)
     .first<ProductRow>();
   if (!row || !isCommerciallyValidProduct(row)) return jsonError("Not found", 404);
-  return json(toPublicProduct(row));
+  return json(toPublicProduct(row, ownedSlug(row, await loadSlugOwners(env.DB))));
 }
 
 async function loadOrder(env: Env, id: number) {
