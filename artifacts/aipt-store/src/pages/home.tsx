@@ -9,6 +9,7 @@ import { useListProducts, useListCategories } from "@workspace/api-client-react"
 import { useInView } from "@/hooks/use-in-view";
 import { WHATSAPP_URL } from "@/config/contact";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
+import { productPath } from "@/lib/product-path";
 import { useSeo } from "@/hooks/use-seo";
 import { useRecentlyViewed } from "@/hooks/use-recently-viewed";
 import { Clock as ClockIcon } from "lucide-react";
@@ -302,7 +303,7 @@ export default function Home({ onAddToCart }: HomeProps) {
               const grad = getProductGradient(p.name);
               const sav = p.original_price_bdt ? Math.round((1 - p.price_bdt / p.original_price_bdt) * 100) : 0;
               return (
-                <Link key={p.id} href={`/products/${p.id}`}>
+                <Link key={p.id} href={productPath(p)}>
                   <Card
                     className="overflow-hidden h-full hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer"
                     data-testid={`recent-product-${p.id}`}
@@ -449,7 +450,7 @@ export default function Home({ onAddToCart }: HomeProps) {
                         <div className="text-xs text-muted-foreground">{product.duration_days || 30} days</div>
                       </div>
                       <div className="flex gap-2">
-                        <Link href={`/products/${product.id}`}>
+                        <Link href={productPath(product)}>
                           <Button variant="outline" size="sm" data-testid={`btn-details-${product.id}`}>Details</Button>
                         </Link>
                         <Button

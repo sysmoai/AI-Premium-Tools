@@ -7,6 +7,7 @@ import type { CartItem } from "@/hooks/use-cart";
 import { useSeo } from "@/hooks/use-seo";
 import { TrustBadgesRow } from "@/components/trust-badges-row";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
+import { productPath } from "@/lib/product-path";
 import { useListProducts } from "@workspace/api-client-react";
 
 interface CartProps {
@@ -56,7 +57,7 @@ export default function Cart({ items, total, onRemove, onUpdateQuantity }: CartP
               {suggestions.map(p => {
                 const grad = getProductGradient(p.name);
                 return (
-                  <Link key={p.id} href={`/products/${p.id}`}>
+                  <Link key={p.id} href={productPath(p)}>
                     <Card className="overflow-hidden h-full hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer">
                       <ProductLogoBanner
                         name={p.name}
@@ -211,7 +212,7 @@ export default function Cart({ items, total, onRemove, onUpdateQuantity }: CartP
                 {suggestions.map(p => {
                   const grad = getProductGradient(p.name);
                   return (
-                    <Link key={p.id} href={`/products/${p.id}`}>
+                    <Link key={p.id} href={productPath(p)}>
                       <Card className="overflow-hidden h-full hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer" data-testid={`suggested-${p.id}`}>
                         <ProductLogoBanner
                           name={p.name}

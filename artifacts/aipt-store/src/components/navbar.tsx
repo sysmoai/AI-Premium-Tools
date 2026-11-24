@@ -1,3 +1,4 @@
+import { productPath } from "@/lib/product-path";
 import { Link, useLocation } from "wouter";
 import {
   ShoppingCart,
@@ -265,7 +266,7 @@ export default function Navbar({ cartCount }: NavbarProps) {
                       <button
                         type="button"
                         key={p.id}
-                        onClick={() => { setSearchOpen(false); setSearchValue(""); navigate(`/products/${p.id}`); }}
+                        onClick={() => { setSearchOpen(false); setSearchValue(""); navigate(productPath(p)); }}
                         className="w-full flex items-center gap-3 px-3 py-2 hover:bg-muted text-left transition-colors"
                         data-testid={`search-result-${p.id}`}
                       >

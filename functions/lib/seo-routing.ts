@@ -1,4 +1,5 @@
 import { isCommerciallyValidProduct } from "./commercial-policy";
+import { isKnownProductSlug, loadSlugOwners, ownedSlug } from "./product-slugs";
 
 /**
  * Server-side SEO routing for the storefront SPA.
@@ -7,6 +8,7 @@ import { isCommerciallyValidProduct } from "./commercial-policy";
  * public/_redirects), so crawlers saw identical, indexable soft-404s with no
  * canonical. This layer runs before the SPA shell is returned and:
  *   - 301s www.aipremium.tools and trailing-slash URLs to one canonical form
+ *   - 301s numeric product URLs to their slug (/products/2 -> /products/chatgpt-plus)
  *   - returns a real 404 (noindex) for unknown routes and non-sellable products
  *   - writes a per-route <title>, description, canonical and og:url into the shell
  *   - serves /sitemap.xml from the same commercial allow-list as /api/products
@@ -93,7 +95,9 @@ type ProductRow = {
   commercial_state?: string | null;
 };
 
-type Resolved = { status: 200 | 404; meta: PageMeta; canonicalPath: string | null };
+type Resolved = { status: 200 | 404; meta: PageMeta; canonicalPath: string | null; redirectPath?: string };
+
+const NOT_FOUND: Resolved = { status: 404, meta: NOT_FOUND_META, canonicalPath: null };
 
 function escapeAttr(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -115,6 +119,19 @@ async function loadSellableProduct(db: D1Database, id: number): Promise<ProductR
   return row && isCommerciallyValidProduct(row) ? row : null;
 }
 
+function productPage(row: { name: string }, canonicalPath: string): Resolved {
+  // Fixed template on purpose: D1 descriptions are not commercially reviewed.
+  return {
+    status: 200,
+    meta: {
+      title: `${row.name} in Bangladesh — BDT Price | AIPT`,
+      description: `${row.name} from AIPT with current BDT pricing and provider-compatible activation support.`,
+      index: true,
+    },
+    canonicalPath,
+  };
+}
+
 async function resolvePage(db: D1Database, pathname: string): Promise<Resolved> {
   const known = STATIC_PAGES[pathname];
   if (known) return { status: 200, meta: known, canonicalPath: known.index ? pathname : null };
@@ -124,17 +141,18 @@ async function resolvePage(db: D1Database, pathname: string): Promise<Resolved> 
   const product = /^\/products\/([1-9]\d{0,9})$/.exec(pathname);
   if (product) {
     const row = await loadSellableProduct(db, Number(product[1]));
-    if (!row) return { status: 404, meta: NOT_FOUND_META, canonicalPath: null };
-    // Fixed template on purpose: D1 descriptions are not commercially reviewed.
-    return {
-      status: 200,
-      meta: {
-        title: `${row.name} in Bangladesh — BDT Price | AIPT`,
-        description: `${row.name} from AIPT with current BDT pricing and provider-compatible activation support.`,
-        index: true,
-      },
-      canonicalPath: `/products/${row.id}`,
-    };
+    if (!row) return NOT_FOUND;
+    const slug = ownedSlug(row, await loadSlugOwners(db));
+    const page = productPage(row, `/products/${slug ?? row.id}`);
+    return slug ? { ...page, redirectPath: `/products/${slug}` } : page;
+  }
+
+  // Unknown slugs are rejected before touching D1.
+  const slugged = /^\/products\/([a-z0-9-]+)$/.exec(pathname);
+  if (slugged) {
+    const slug = slugged[1];
+    const row = isKnownProductSlug(slug) ? (await loadSlugOwners(db)).get(slug) : undefined;
+    return row ? productPage(row, `/products/${slug}`) : NOT_FOUND;
   }
 
   // Routes the SPA handles but that must never be indexed.
@@ -183,7 +201,10 @@ async function sitemap(db: D1Database): Promise<Response> {
   const rows = await db
     .prepare("SELECT id, name, price_bdt, is_active, commercial_state FROM products WHERE is_active = 1 ORDER BY category_id, sort_order, id")
     .all<ProductRow>();
-  const productPaths = (rows.results ?? []).filter((row) => isCommerciallyValidProduct(row)).map((row) => `/products/${row.id}`);
+  const owners = await loadSlugOwners(db);
+  const productPaths = (rows.results ?? [])
+    .filter((row) => isCommerciallyValidProduct(row))
+    .map((row) => `/products/${ownedSlug(row, owners) ?? row.id}`);
   const body =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
@@ -258,6 +279,8 @@ export async function handlePageRequest(
     console.error("[aipt-seo] page resolution failed (D1)", url.pathname, err);
     return d1OutageResponse(await next());
   }
+
+  if (resolved.redirectPath) return redirect(`${url.origin}${resolved.redirectPath}${url.search}`);
 
   const response = await next();
   if (!(response.headers.get("content-type") ?? "").includes("text/html")) return response;
