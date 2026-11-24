@@ -20,7 +20,8 @@
 // AIPT_RETIRED_REPO_SECRETS=NAME1,NAME2: repository-level secret names that
 // have been deleted. An unbound secret+write workflow is downgraded to WARN only
 // when EVERY secret it references is in this list; any other secret name keeps
-// it HIGH. (Fail-closed: an empty/unset list downgrades nothing.)
+// it HIGH, as does any environment binding or a secret reference whose name
+// cannot be read. (Fail-closed: an empty/unset list downgrades nothing.)
 
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -30,7 +31,11 @@ const git = (...args) =>
 
 const MAIN = 'origin/main';
 const FOREIGN = /\b(save[- ]?on[- ]?sub|saveonsub|aips|ai[- ]premium[- ]shop|aipremiumshop|aitp|ai[- ]team[- ]premium|aiteampremium|softsuper|redwanmart)\b/i;
-const SECRET = /\bsecrets\.(?!GITHUB_TOKEN\b)([A-Z0-9_]+)/g;
+const SECRET = /\bsecrets\s*(?:\.\s*|\[\s*['"])([A-Za-z0-9_]+)/gi;
+// Any use of the secrets context whose names cannot be read from the file.
+const OPAQUE_SECRET = /\bsecrets\s*(?:\[\s*(?!\s|['"])|\.\s*\*)|\btoJSON\s*\(\s*secrets\s*\)|^\s*secrets:\s*['"]?inherit\b/im;
+// Any environment binding: scalar, mapping, flow, quoted key or expression.
+const ANY_ENVIRONMENT = /(?:^|[\s{,])['"]?environment['"]?\s*:/im;
 const WRITES = [
   ['pages-deploy', /wrangler\s+pages\s+deploy/],
   ['worker-deploy', /wrangler\s+(deploy|publish)\b/],
@@ -64,7 +69,8 @@ function triggers(text) {
 }
 
 function analyse(text) {
-  const secrets = [...new Set([...text.matchAll(SECRET)].map((m) => m[1]))];
+  const secrets = [...new Set([...text.matchAll(SECRET)].map((m) => m[1].toUpperCase()))].filter((s) => s !== 'GITHUB_TOKEN');
+  if (OPAQUE_SECRET.test(text)) secrets.push('(OPAQUE)'); // never matches a retired name
   const writes = WRITES.filter(([, re]) => re.test(text)).map(([name]) => name);
   const foreign = (text.match(FOREIGN) || [])[0] ?? null;
   const envBound = /^\s+environment:\s*['"]?Production['"]?\s*$/m.test(text);
@@ -74,7 +80,9 @@ function analyse(text) {
   if (foreign && (secrets.length || writes.length)) severity = 'CRITICAL';
   else if (prt && secrets.length) severity = 'HIGH';
   else if (secrets.length && writes.length && !envBound) {
-    const allRetired = secrets.every((s) => retiredSecrets.has(s));
+    // A named environment may define its own secret under a retired name, so
+    // the downgrade applies only when the file binds no environment at all.
+    const allRetired = !ANY_ENVIRONMENT.test(text) && secrets.every((s) => retiredSecrets.has(s));
     severity = allRetired ? 'WARN' : 'HIGH';
   }
   else if (secrets.length) severity = 'WARN';
