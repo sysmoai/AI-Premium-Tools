@@ -125,6 +125,9 @@ jobs:
             if (!uniqueLocs.has(url)) add('P1', 'Indexable static route missing from sitemap', url);
           }
 
+          const productIds = products
+            .map((product) => Number(product?.id))
+            .filter((id) => Number.isInteger(id) && id > 0);
           // A product is listed under its slug, or its numeric id when it has none.
           const missingProductUrls = products
             .filter((product) => Number.isInteger(Number(product?.id)) && Number(product.id) > 0)
