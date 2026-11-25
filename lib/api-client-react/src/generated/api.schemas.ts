@@ -12,6 +12,8 @@ export interface HealthStatus {
 export interface Product {
   id: number;
   slug?: string;
+  seo_title?: string;
+  seo_description?: string;
   name: string;
   description?: string;
   price_bdt: number;

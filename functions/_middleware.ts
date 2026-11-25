@@ -3,6 +3,7 @@ import {
   findCommercialRule,
   isCommerciallyValidProduct,
 } from "./lib/commercial-policy";
+import { productSeo } from "./lib/product-seo";
 import { loadSlugOwners, ownedSlug } from "./lib/product-slugs";
 import { handlePageRequest } from "./lib/seo-routing";
 
@@ -54,6 +55,7 @@ function parseFeatures(value: unknown): unknown {
 }
 
 function toPublicProduct(r: ProductRow, slug: string | undefined) {
+  const seo = productSeo(r);
   return {
     id: r.id,
     name: r.name,
@@ -70,6 +72,8 @@ function toPublicProduct(r: ProductRow, slug: string | undefined) {
     stock_count: r.stock_count,
     order_count: r.order_count,
     slug,
+    seo_title: seo.title,
+    seo_description: seo.description,
     plan_type: r.plan_type ?? undefined,
     delivery_type: r.delivery_type ?? undefined,
     commercial_state: r.commercial_state,

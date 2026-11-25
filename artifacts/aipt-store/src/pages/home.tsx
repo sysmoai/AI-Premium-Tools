@@ -478,8 +478,8 @@ export default function Home({ onAddToCart }: HomeProps) {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { icon: <Zap className="h-6 w-6" />, title: "15–20% Lower Prices", desc: "We pass the savings directly to students. Same tools, better price — always." },
-              { icon: <Users className="h-6 w-6" />, title: "Student-First Packages", desc: "8 exclusive bundles designed for university life — research, design, writing, and more." },
+              { icon: <Zap className="h-6 w-6" />, title: "Clear BDT Pricing", desc: "Each listed plan shows its current service price in BDT before you order." },
+              { icon: <Users className="h-6 w-6" />, title: "Local Support", desc: "Ask AIPT on WhatsApp in Bangla or English before and after you order." },
               { icon: <Clock className="h-6 w-6" />, title: "Activation Support", desc: "Pay via bKash, Nagad, or bank transfer. AIPT confirms the supported activation method after payment verification." },
             ].map(item => (
               <div key={item.title} className="text-center">
@@ -497,58 +497,21 @@ export default function Home({ onAddToCart }: HomeProps) {
         </div>
       </section>
 
-      {/* Customer testimonials */}
-      <section className="max-w-6xl mx-auto px-4 py-16" data-testid="section-testimonials">
-        <div className="text-center mb-10">
-          <h2 className="text-3xl font-bold mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>
-            What our customers say
-          </h2>
-          <p className="text-muted-foreground">Real reviews from Bangladeshi students, freelancers and creators</p>
-        </div>
+      {/* How AIPT checks plans. Not testimonials: no names, quotes or stars. */}
+      <section className="max-w-6xl mx-auto px-4 py-16" data-testid="section-how-aipt-works">
+        <h2 className="text-3xl font-bold mb-10 text-center" style={{ fontFamily: "Outfit, sans-serif" }}>
+          How AIPT checks every plan
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {[
-            {
-              name: "Tahmid R.",
-              role: "Freelance designer · Dhaka",
-              quote: "Got my Midjourney within 40 minutes of paying via bKash. Been using it for 4 months without a single issue. Saved me thousands of taka vs paying directly.",
-              tool: "Midjourney",
-            },
-            {
-              name: "Sumaiya I.",
-              role: "BUET student · Researcher",
-              quote: "ChatGPT Plus at this price is unbeatable in BD. Support replied to my WhatsApp in 5 minutes when I had a login question. Will keep renewing.",
-              tool: "ChatGPT Plus",
-            },
-            {
-              name: "Imran H.",
-              role: "Content creator · Chittagong",
-              quote: "Tried two other sellers before AIPT — both had problems. AIPT delivered within an hour and gave a real warranty. This is the only place I buy from now.",
-              tool: "Canva Pro",
-            },
+            { title: "Order-linked reviews", body: "Reviews on product pages are marked verified only when they can be linked to a matching order." },
+            { title: "Approved prices", body: "Direct-sale prices come from the approved AIPT register. Plans that cannot be verified are held for confirmation." },
+            { title: "Supported access", body: "AIPT does not sell shared-credential offers and confirms the access method before activation." },
           ].map(t => (
-            <Card key={t.name} className="h-full">
-              <CardContent className="p-6 flex flex-col h-full">
-                <div className="flex items-center gap-0.5 mb-3">
-                  {[1, 2, 3, 4, 5].map(n => (
-                    <Star key={n} className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden="true" />
-                  ))}
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed mb-4 flex-1">"{t.quote}"</p>
-                <div className="flex items-center gap-3 pt-3 border-t border-border">
-                  <div
-                    className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
-                    style={{ background: "linear-gradient(135deg, hsl(262 83% 58%), hsl(220 90% 60%))" }}
-                  >
-                    {t.name.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-semibold text-sm">{t.name}</div>
-                    <div className="text-xs text-muted-foreground truncate">{t.role}</div>
-                  </div>
-                  <div className="ml-auto text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">
-                    {t.tool}
-                  </div>
-                </div>
+            <Card key={t.title} className="h-full">
+              <CardContent className="p-6">
+                <h3 className="font-bold text-lg mb-2">{t.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{t.body}</p>
               </CardContent>
             </Card>
           ))}
