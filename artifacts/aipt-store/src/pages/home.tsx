@@ -86,7 +86,7 @@ export default function Home({ onAddToCart }: HomeProps) {
       a: "Message AIPT on WhatsApp with your order ID — we replace failed accounts free of charge during the 30-day warranty window.",
     },
     {
-      q: "Why is AIPT cheaper than buying directly from the vendor?",
+      q: "How does AIPT pricing work?",
       a: "Direct vendor pricing in Bangladesh adds 15% VAT plus FX markup, and requires an international credit card. AIPT pools verified subscriptions and bills locally in BDT, passing the savings to Bangladeshi students, freelancers, and creators.",
     },
   ];
