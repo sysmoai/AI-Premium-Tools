@@ -83,7 +83,7 @@ export default function Home({ onAddToCart }: HomeProps) {
     },
     {
       q: "What if my AI subscription stops working?",
-      a: "Message AIPT on WhatsApp with your order ID — we replace failed accounts free of charge during the 30-day warranty window.",
+      a: "Message AIPT on WhatsApp with your order ID. Replacements and refunds follow the AIPT Refund & Replacement Policy, linked at the bottom of every page.",
     },
     {
       q: "How does AIPT pricing work?",

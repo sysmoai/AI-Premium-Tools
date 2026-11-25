@@ -54,7 +54,7 @@ const FAQ_GROUPS: Array<{ title: string; items: FaqItem[] }> = [
     items: [
       {
         q: "What support is included?",
-        a: "If access changes during the confirmed service period, message AIPT on WhatsApp with your order ID. We review it against the order and the current provider status before confirming a resolution.",
+        a: "Message AIPT on WhatsApp with your order ID. Replacements and refunds follow the AIPT Refund & Replacement Policy, linked at the bottom of every page.",
       },
       {
         q: "What happens when the service period ends?",
@@ -62,7 +62,7 @@ const FAQ_GROUPS: Array<{ title: string; items: FaqItem[] }> = [
       },
       {
         q: "Do you offer refunds?",
-        a: "Order resolution depends on payment status, activation status, and the confirmed service terms. Contact AIPT with the order ID for review before any resolution is promised.",
+        a: "Yes. Refunds and replacements follow the AIPT Refund & Replacement Policy, linked at the bottom of every page. Message AIPT on WhatsApp with your order ID to make a request.",
       },
       {
         q: "How do I contact support?",

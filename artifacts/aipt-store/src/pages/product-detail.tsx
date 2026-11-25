@@ -61,11 +61,11 @@ interface ProductDetailProps {
 const TRUST_BADGES = [
   { Icon: ShieldCheck, title: "30-Day Warranty", desc: "Replaced if it fails" },
   { Icon: Clock, title: "1-Hour Activation", desc: "After payment" },
-  { Icon: RefreshCw, title: "Issue Resolution", desc: "Resolution based on provider/account status" },
+  { Icon: RefreshCw, title: "Issue Resolution", desc: "Under the Refund & Replacement Policy" },
   { Icon: Lock, title: "Secure Payment", desc: "bKash · Nagad · Bank" },
 ];
 
-function getFaqItems(productName: string, durationDays: number) {
+function getFaqItems(productName: string) {
   return [
     {
       q: `How will I receive my ${productName} access?`,
@@ -81,7 +81,7 @@ function getFaqItems(productName: string, durationDays: number) {
     },
     {
       q: "What happens if my account stops working?",
-      a: `If your account fails for any reason during the ${durationDays}-day period, simply message us on WhatsApp and we'll replace it free of charge — no questions asked.`,
+      a: "Message AIPT on WhatsApp with your order ID. Replacements and refunds follow the AIPT Refund & Replacement Policy, linked at the bottom of every page.",
     },
     {
       q: "Can I share the account with friends?",
@@ -89,13 +89,13 @@ function getFaqItems(productName: string, durationDays: number) {
     },
     {
       q: "Do you offer refunds?",
-      a: "Yes — if we're unable to deliver your order within 24 hours, you get a full refund. Once delivered, we offer free replacement instead of refund within the warranty period.",
+      a: "Yes. Refunds and replacements follow the AIPT Refund & Replacement Policy, linked at the bottom of every page. Message AIPT on WhatsApp with your order ID to make a request.",
     },
   ];
 }
 
-function FaqItems({ productName, durationDays }: { productName: string; durationDays: number }) {
-  const items = getFaqItems(productName, durationDays);
+function FaqItems({ productName }: { productName: string }) {
+  const items = getFaqItems(productName);
   return (
     <Accordion type="single" collapsible className="w-full">
       {items.map((item, i) => (
@@ -277,7 +277,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
         {
           "@context": "https://schema.org",
           "@type": "FAQPage",
-          mainEntity: getFaqItems(product.name, durationDaysSeo).map(item => ({
+          mainEntity: getFaqItems(product.name).map(item => ({
             "@type": "Question",
             name: item.q,
             acceptedAnswer: { "@type": "Answer", text: item.a },
@@ -537,11 +537,11 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
               </TabsContent>
 
               <TabsContent value="warranty" className="mt-0">
-                <h3 className="font-bold mb-3 text-base">Warranty & replacement</h3>
+                <h3 className="font-bold mb-3 text-base">Refunds &amp; replacements</h3>
                 <div className="space-y-3 text-sm leading-relaxed">
                   <p>
-                    Every order comes with a <strong>30-day warranty</strong>. If your access ever stops working during the
-                    warranty window, message us on WhatsApp and we will replace your account free of charge — no questions asked.
+                    If your access stops working, message AIPT on WhatsApp with your order ID. Replacements and refunds follow the{" "}
+                    <Link href="/refund-policy" className="underline text-primary">Refund &amp; Replacement Policy</Link>.
                   </p>
                   <p className="text-muted-foreground">
                     We never sell cracked or hacked accounts. Every {product.name} subscription is sourced from official channels,
@@ -549,8 +549,8 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
                   </p>
                   <ul className="space-y-2 mt-2">
                     {[
-                      "Free replacement during the warranty period",
-                      "Full refund if we cannot deliver within 24 hours",
+                      "Request using your order ID",
+                      "Handled under the published policy",
                       "Lifetime WhatsApp support during your subscription",
                     ].map(p => (
                       <li key={p} className="flex items-start gap-2">
@@ -564,7 +564,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
 
               <TabsContent value="faq" className="mt-0">
                 <h3 className="font-bold mb-3 text-base">Frequently asked questions</h3>
-                <FaqItems productName={product.name} durationDays={durationDays} />
+                <FaqItems productName={product.name} />
               </TabsContent>
             </Tabs>
           </div>
