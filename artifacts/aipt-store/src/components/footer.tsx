@@ -25,7 +25,7 @@ import { useListCategories } from "@workspace/api-client-react";
 const TRUST_BADGES = [
   { icon: ShieldCheck, title: "Support Included", subtitle: "Issue review via WhatsApp" },
   { icon: Truck, title: "Activation Support", subtitle: "Method confirmed after payment" },
-  { icon: RefreshCw, title: "Order-linked Support", subtitle: "Resolution based on order and provider status" },
+  { icon: RefreshCw, title: "Order-linked Support", subtitle: "Refund & Replacement Policy applies" },
   { icon: Lock, title: "Safe Payments", subtitle: "bKash · Nagad · Rocket · Bank" },
 ];
 
