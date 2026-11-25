@@ -1,4 +1,5 @@
 import { isCommerciallyValidProduct } from "./commercial-policy";
+import { productSeo } from "./product-seo";
 import { isKnownProductSlug, loadSlugOwners, ownedSlug } from "./product-slugs";
 
 /**
@@ -119,15 +120,10 @@ async function loadSellableProduct(db: D1Database, id: number): Promise<ProductR
   return row && isCommerciallyValidProduct(row) ? row : null;
 }
 
-function productPage(row: { name: string }, canonicalPath: string): Resolved {
-  // Fixed template on purpose: D1 descriptions are not commercially reviewed.
+function productPage(row: { name: string; price_bdt: number }, canonicalPath: string): Resolved {
   return {
     status: 200,
-    meta: {
-      title: `${row.name} in Bangladesh — BDT Price | AIPT`,
-      description: `${row.name} from AIPT with current BDT pricing and provider-compatible activation support.`,
-      index: true,
-    },
+    meta: { ...productSeo(row), index: true },
     canonicalPath,
   };
 }

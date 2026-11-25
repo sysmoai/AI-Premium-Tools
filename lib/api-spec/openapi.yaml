@@ -504,6 +504,10 @@ components:
           type: integer
         slug:
           type: string
+        seo_title:
+          type: string
+        seo_description:
+          type: string
         name:
           type: string
         description:

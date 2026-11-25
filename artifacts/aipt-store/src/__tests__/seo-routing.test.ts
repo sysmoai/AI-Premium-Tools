@@ -3,6 +3,7 @@
 // No network, no D1, no Cloudflare: D1 and HTMLRewriter are in-memory mocks.
 import { test, expect } from "vitest";
 import { handlePageRequest } from "../../../../functions/lib/seo-routing";
+import { productSeo } from "../../../../functions/lib/product-seo";
 import { AIPT_COMMERCIAL_RULES } from "../../../../functions/lib/commercial-policy";
 import { productPath, resolveProductId } from "../lib/product-path";
 
@@ -102,6 +103,13 @@ test("slugs are unique and cannot be mistaken for numeric ids", () => {
   const ids = AIPT_COMMERCIAL_RULES.map((rule) => rule.id);
   expect(new Set(ids).size).toBe(ids.length);
   for (const id of ids) expect(id).toMatch(/^[a-z][a-z0-9-]*$/);
+});
+
+test("product search copy names the plan and its price and makes no service promise", () => {
+  const seo = productSeo({ name: "ChatGPT Plus — Personal", price_bdt: 3390 });
+  expect(seo.title).toBe("ChatGPT Plus — Personal Price in Bangladesh — ৳3390 | AIPT");
+  expect(seo.description).toContain("৳3390");
+  expect(`${seo.title} ${seo.description}`).not.toMatch(/warranty|refund|guarantee|unlimited|hour|minute/i);
 });
 
 test("storefront resolves numeric ids and slugs", () => {

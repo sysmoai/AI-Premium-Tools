@@ -61,7 +61,7 @@ interface ProductDetailProps {
 const TRUST_BADGES = [
   { Icon: ShieldCheck, title: "30-Day Warranty", desc: "Replaced if it fails" },
   { Icon: Clock, title: "1-Hour Activation", desc: "After payment" },
-  { Icon: RefreshCw, title: "Easy Replacement", desc: "Free swap in warranty" },
+  { Icon: RefreshCw, title: "Issue Resolution", desc: "Resolution based on provider/account status" },
   { Icon: Lock, title: "Secure Payment", desc: "bKash · Nagad · Bank" },
 ];
 
@@ -175,16 +175,9 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
   })();
 
   const baseDesc = product?.description?.replace(/\s+/g, " ").trim() ?? "";
-  const seoTitle = product
-    ? `${product.name} (${durationDaysSeo} days) — ৳${product.price_bdt} in Bangladesh`
-    : "Product";
-  const seoDesc = product
-    ? (
-        `${product.name} in Bangladesh — ৳${product.price_bdt} BDT for ${durationDaysSeo} days. ` +
-        (baseDesc ? `${baseDesc.slice(0, 95)}${baseDesc.length > 95 ? "…" : ""} ` : "") +
-        `Pay via bKash, Nagad, Rocket, Upay or bank. 1-hour activation, 30-day warranty.`
-      ).slice(0, 300)
-    : undefined;
+  // Same copy the server writes into the page head (functions/lib/product-seo.ts).
+  const seoTitle = product?.seo_title ?? product?.name ?? "Product";
+  const seoDesc = product?.seo_description;
   const seoKeywords = product
     ? `${product.name}, ${product.name} Bangladesh, ${product.name} price BDT, buy ${product.name} bKash, ${product.category_name ?? "AI tools"} Bangladesh, AI subscription BD, AIPT`
     : undefined;
@@ -223,28 +216,8 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
               url: ORIGIN,
             },
             eligibleRegion: { "@type": "Country", name: "Bangladesh" },
-            // Google Merchant 2024 requirements — silences Search Console warnings
-            hasMerchantReturnPolicy: {
-              "@type": "MerchantReturnPolicy",
-              applicableCountry: "BD",
-              returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
-              merchantReturnDays: 30,
-              returnMethod: "https://schema.org/ReturnByMail",
-              returnFees: "https://schema.org/FreeReturn",
-            },
-            shippingDetails: {
-              "@type": "OfferShippingDetails",
-              shippingRate: { "@type": "MonetaryAmount", value: "0", currency: "BDT" },
-              shippingDestination: {
-                "@type": "DefinedRegion",
-                addressCountry: "BD",
-              },
-              deliveryTime: {
-                "@type": "ShippingDeliveryTime",
-                handlingTime: { "@type": "QuantitativeValue", minValue: 0, maxValue: 1, unitCode: "HUR" },
-                transitTime: { "@type": "QuantitativeValue", minValue: 0, maxValue: 0, unitCode: "HUR" },
-              },
-            },
+            // No return-policy or delivery-time schema: the Refund and Delivery
+            // policy pages are the only source for those terms.
           },
           ...(reviewCount > 0
             ? {
