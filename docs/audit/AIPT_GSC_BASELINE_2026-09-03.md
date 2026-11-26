@@ -300,3 +300,16 @@ The authenticated Search Console report/API dataset itself has not been retrieve
 **AIPT-0005 STATUS: PARTIAL / BLOCKED ON AUTHENTICATED GSC REPORT EXPORT.**
 
 Do not label this step PASS until the exact Search Console exports/report totals above are captured. The verified Gmail evidence is authoritative supporting baseline evidence, but it does not replace the report tables and counts required by AIPT-0005.
+
+---
+
+## Update — 2026-11-26
+
+Status is unchanged: the authenticated Search Console export is still required, and nothing in this document was replaced by real Search Console data.
+
+When the export is taken, compare it with these URL changes made after this baseline:
+
+- Product URLs moved from `/products/<id>` to slugs; each numeric URL now returns 301 to its slug. Expect numeric URLs to drop out of the index and slug URLs to replace them.
+- Unknown routes, non-sellable products and `/products/01`-style URLs now return 404 with `noindex` (previously soft 200).
+- `www.aipremium.tools` and trailing-slash URLs 301 to the canonical apex URL.
+- The sitemap is generated from D1 with 35 URLs; submit `https://aipremium.tools/sitemap.xml` again after the export.
