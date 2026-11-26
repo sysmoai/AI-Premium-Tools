@@ -134,7 +134,7 @@ Do not replace this sequence with ad-hoc `schema.sql` execution against producti
 
 ## 5. Deployment pipeline: validation runs, production publish is disabled
 
-`.github/workflows/deploy.yml` validates every pull request and every push to `main`:
+`.github/workflows/deploy.yml` validates every pull request and can be run manually (`workflow_dispatch`). It does not run on push to `main`: the ruleset requires a green `validate` check on the pull request before merge, so the merged commit is the validated one. Steps:
 
 1. checkout, pnpm and Node.js setup;
 2. repository/business-unit isolation guard and design-freeze guard;
