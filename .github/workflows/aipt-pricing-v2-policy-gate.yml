@@ -1,0 +1,63 @@
+name: AIPT Pricing v2 Policy Gate
+
+on:
+  pull_request:
+    paths:
+      - 'functions/**'
+      - 'ops/aipt-pricing-v2.json'
+      - 'scripts/aipt-pricing-policy-audit.mjs'
+      - 'scripts/ops/aipt-commercial-v2-pages-function.ts'
+      - 'artifacts/aipt-store/**'
+      - '.github/workflows/aipt-pricing-v2-policy-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  commercial-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout proposed release
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify pricing SSOT and runtime parity
+        run: node scripts/aipt-pricing-policy-audit.mjs
+
+      - name: Typecheck workspace
+        run: pnpm run typecheck
+
+      - name: Test storefront
+        run: pnpm --filter @workspace/aipt-store run test
+
+      - name: Build governed storefront
+        run: pnpm --filter @workspace/aipt-store run build
+        env:
+          PORT: '8080'
+          BASE_PATH: '/'
+          VITE_SITE_URL: 'https://aipremium.tools'
+
+      - name: Compile Cloudflare Pages Functions
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler pages functions build functions --outfile=/tmp/aipt-pages-functions.js
+          test -s /tmp/aipt-pages-functions.js
+          grep -q 'aipt-pricing-v2-2026-09-17' /tmp/aipt-pages-functions.js
+          echo 'Cloudflare Pages Functions compiled with pricing-v2 policy.'

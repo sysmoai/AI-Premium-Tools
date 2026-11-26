@@ -1,3 +1,4 @@
+import { productPath } from "@/lib/product-path";
 import { Link, useLocation } from "wouter";
 import {
   ShoppingCart,
@@ -27,10 +28,10 @@ interface NavbarProps {
 }
 
 const ANNOUNCEMENTS = [
-  { icon: ShieldCheck, text: "30-day warranty on every order" },
-  { icon: Clock, text: "Activation within 1 hour after payment" },
+  { icon: ShieldCheck, text: "Order-linked support on WhatsApp" },
+  { icon: Clock, text: "Activation method confirmed after payment" },
   { icon: Wallet, text: "bKash · Nagad · Rocket · Bank Transfer" },
-  { icon: Sparkles, text: "Trusted by 1,000+ Bangladeshi students & freelancers" },
+  { icon: Sparkles, text: "Selected AI subscriptions with BDT pricing" },
 ];
 
 export default function Navbar({ cartCount }: NavbarProps) {
@@ -265,7 +266,7 @@ export default function Navbar({ cartCount }: NavbarProps) {
                       <button
                         type="button"
                         key={p.id}
-                        onClick={() => { setSearchOpen(false); setSearchValue(""); navigate(`/products/${p.id}`); }}
+                        onClick={() => { setSearchOpen(false); setSearchValue(""); navigate(productPath(p)); }}
                         className="w-full flex items-center gap-3 px-3 py-2 hover:bg-muted text-left transition-colors"
                         data-testid={`search-result-${p.id}`}
                       >
