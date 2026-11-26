@@ -43,6 +43,7 @@ import { useSeo } from "@/hooks/use-seo";
 import { SITE_URL } from "@/config/site";
 import { useRecentlyViewed } from "@/hooks/use-recently-viewed";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
+import { productPath, resolveProductId } from "@/lib/product-path";
 import { ProductMediaGallery } from "@/components/product-media-gallery";
 import { CustomerReviews } from "@/components/customer-reviews";
 import { WHATSAPP_URL } from "@/config/contact";
@@ -60,11 +61,11 @@ interface ProductDetailProps {
 const TRUST_BADGES = [
   { Icon: ShieldCheck, title: "30-Day Warranty", desc: "Replaced if it fails" },
   { Icon: Clock, title: "1-Hour Activation", desc: "After payment" },
-  { Icon: RefreshCw, title: "Easy Replacement", desc: "Free swap in warranty" },
+  { Icon: RefreshCw, title: "Issue Resolution", desc: "Under the Refund & Replacement Policy" },
   { Icon: Lock, title: "Secure Payment", desc: "bKash · Nagad · Bank" },
 ];
 
-function getFaqItems(productName: string, durationDays: number) {
+function getFaqItems(productName: string) {
   return [
     {
       q: `How will I receive my ${productName} access?`,
@@ -80,7 +81,7 @@ function getFaqItems(productName: string, durationDays: number) {
     },
     {
       q: "What happens if my account stops working?",
-      a: `If your account fails for any reason during the ${durationDays}-day period, simply message us on WhatsApp and we'll replace it free of charge — no questions asked.`,
+      a: "Message AIPT on WhatsApp with your order ID. Replacements and refunds follow the AIPT Refund & Replacement Policy, linked at the bottom of every page.",
     },
     {
       q: "Can I share the account with friends?",
@@ -88,13 +89,13 @@ function getFaqItems(productName: string, durationDays: number) {
     },
     {
       q: "Do you offer refunds?",
-      a: "Yes — if we're unable to deliver your order within 24 hours, you get a full refund. Once delivered, we offer free replacement instead of refund within the warranty period.",
+      a: "Yes. Refunds and replacements follow the AIPT Refund & Replacement Policy, linked at the bottom of every page. Message AIPT on WhatsApp with your order ID to make a request.",
     },
   ];
 }
 
-function FaqItems({ productName, durationDays }: { productName: string; durationDays: number }) {
-  const items = getFaqItems(productName, durationDays);
+function FaqItems({ productName }: { productName: string }) {
+  const items = getFaqItems(productName);
   return (
     <Accordion type="single" collapsible className="w-full">
       {items.map((item, i) => (
@@ -114,11 +115,19 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { ids: recentIds, track: trackViewed } = useRecentlyViewed();
-  const productId = Number(id);
 
-  const { data: product, isLoading } = useGetProduct(productId, {
-    query: { enabled: !!id, queryKey: getGetProductQueryKey(productId) },
+  // Route param is a slug or a numeric id; slugs resolve through the catalog list.
+  const allProductsParams = { is_active: true };
+  const { data: allProducts, isLoading: catalogLoading } = useListProducts(allProductsParams, {
+    query: { queryKey: getListProductsQueryKey(allProductsParams) },
   });
+  const resolvedId = resolveProductId(id, allProducts);
+  const productId = resolvedId ?? 0;
+
+  const { data: product, isLoading: productLoading } = useGetProduct(productId, {
+    query: { enabled: resolvedId !== undefined, queryKey: getGetProductQueryKey(productId) },
+  });
+  const isLoading = productLoading || (resolvedId === undefined && catalogLoading);
 
   const relatedParams = { is_active: true, category_id: product?.category_id };
   const { data: relatedAll } = useListProducts(relatedParams, {
@@ -126,11 +135,6 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
       enabled: !!product?.category_id,
       queryKey: getListProductsQueryKey(relatedParams),
     },
-  });
-
-  const allProductsParams = { is_active: true };
-  const { data: allProducts } = useListProducts(allProductsParams, {
-    query: { queryKey: getListProductsQueryKey(allProductsParams) },
   });
 
   // Scroll to top when route changes
@@ -159,7 +163,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
 
   // ─── SEO: per-product meta + Google-2024-compliant Product / Breadcrumb / FAQ JSON-LD ───
   const ORIGIN = typeof window !== "undefined" ? window.location.origin : SITE_URL;
-  const productUrl = product ? `${ORIGIN}/products/${product.id}` : ORIGIN;
+  const productUrl = product ? `${ORIGIN}${productPath(product)}` : ORIGIN;
   const fallbackOg = `${ORIGIN}/opengraph.jpg`;
   const productImage = product?.image_url || fallbackOg;
   const durationDaysSeo = product?.duration_days ?? 30;
@@ -171,16 +175,9 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
   })();
 
   const baseDesc = product?.description?.replace(/\s+/g, " ").trim() ?? "";
-  const seoTitle = product
-    ? `${product.name} (${durationDaysSeo} days) — ৳${product.price_bdt} in Bangladesh`
-    : "Product";
-  const seoDesc = product
-    ? (
-        `${product.name} in Bangladesh — ৳${product.price_bdt} BDT for ${durationDaysSeo} days. ` +
-        (baseDesc ? `${baseDesc.slice(0, 95)}${baseDesc.length > 95 ? "…" : ""} ` : "") +
-        `Pay via bKash, Nagad, Rocket, Upay or bank. 1-hour activation, 30-day warranty.`
-      ).slice(0, 300)
-    : undefined;
+  // Same copy the server writes into the page head (functions/lib/product-seo.ts).
+  const seoTitle = product?.seo_title ?? product?.name ?? "Product";
+  const seoDesc = product?.seo_description;
   const seoKeywords = product
     ? `${product.name}, ${product.name} Bangladesh, ${product.name} price BDT, buy ${product.name} bKash, ${product.category_name ?? "AI tools"} Bangladesh, AI subscription BD, AIPT`
     : undefined;
@@ -219,28 +216,8 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
               url: ORIGIN,
             },
             eligibleRegion: { "@type": "Country", name: "Bangladesh" },
-            // Google Merchant 2024 requirements — silences Search Console warnings
-            hasMerchantReturnPolicy: {
-              "@type": "MerchantReturnPolicy",
-              applicableCountry: "BD",
-              returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
-              merchantReturnDays: 30,
-              returnMethod: "https://schema.org/ReturnByMail",
-              returnFees: "https://schema.org/FreeReturn",
-            },
-            shippingDetails: {
-              "@type": "OfferShippingDetails",
-              shippingRate: { "@type": "MonetaryAmount", value: "0", currency: "BDT" },
-              shippingDestination: {
-                "@type": "DefinedRegion",
-                addressCountry: "BD",
-              },
-              deliveryTime: {
-                "@type": "ShippingDeliveryTime",
-                handlingTime: { "@type": "QuantitativeValue", minValue: 0, maxValue: 1, unitCode: "HUR" },
-                transitTime: { "@type": "QuantitativeValue", minValue: 0, maxValue: 0, unitCode: "HUR" },
-              },
-            },
+            // No return-policy or delivery-time schema: the Refund and Delivery
+            // policy pages are the only source for those terms.
           },
           ...(reviewCount > 0
             ? {
@@ -300,7 +277,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
         {
           "@context": "https://schema.org",
           "@type": "FAQPage",
-          mainEntity: getFaqItems(product.name, durationDaysSeo).map(item => ({
+          mainEntity: getFaqItems(product.name).map(item => ({
             "@type": "Question",
             name: item.q,
             acceptedAnswer: { "@type": "Answer", text: item.a },
@@ -509,7 +486,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
                 </TabsTrigger>
                 <TabsTrigger value="warranty" data-testid="tab-warranty">
                   <ShieldCheck className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
-                  Warranty
+                  Support
                 </TabsTrigger>
                 <TabsTrigger value="faq" data-testid="tab-faq">
                   <HelpCircle className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
@@ -560,11 +537,11 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
               </TabsContent>
 
               <TabsContent value="warranty" className="mt-0">
-                <h3 className="font-bold mb-3 text-base">Warranty & replacement</h3>
+                <h3 className="font-bold mb-3 text-base">Refunds &amp; replacements</h3>
                 <div className="space-y-3 text-sm leading-relaxed">
                   <p>
-                    Every order comes with a <strong>30-day warranty</strong>. If your access ever stops working during the
-                    warranty window, message us on WhatsApp and we will replace your account free of charge — no questions asked.
+                    If your access stops working, message AIPT on WhatsApp with your order ID. Replacements and refunds follow the{" "}
+                    <Link href="/refund-policy" className="underline text-primary">Refund &amp; Replacement Policy</Link>.
                   </p>
                   <p className="text-muted-foreground">
                     We never sell cracked or hacked accounts. Every {product.name} subscription is sourced from official channels,
@@ -572,8 +549,8 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
                   </p>
                   <ul className="space-y-2 mt-2">
                     {[
-                      "Free replacement during the warranty period",
-                      "Full refund if we cannot deliver within 24 hours",
+                      "Request using your order ID",
+                      "Handled under the published policy",
                       "Lifetime WhatsApp support during your subscription",
                     ].map(p => (
                       <li key={p} className="flex items-start gap-2">
@@ -587,7 +564,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
 
               <TabsContent value="faq" className="mt-0">
                 <h3 className="font-bold mb-3 text-base">Frequently asked questions</h3>
-                <FaqItems productName={product.name} durationDays={durationDays} />
+                <FaqItems productName={product.name} />
               </TabsContent>
             </Tabs>
           </div>
@@ -745,7 +722,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
                 const grad = getProductGradient(p.name);
                 const sav = p.original_price_bdt ? Math.round((1 - p.price_bdt / p.original_price_bdt) * 100) : 0;
                 return (
-                  <Link key={p.id} href={`/products/${p.id}`}>
+                  <Link key={p.id} href={productPath(p)}>
                     <Card
                       className="overflow-hidden h-full hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer"
                       data-testid={`related-product-${p.id}`}
@@ -791,7 +768,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
                 const grad = getProductGradient(p.name);
                 const sav = p.original_price_bdt ? Math.round((1 - p.price_bdt / p.original_price_bdt) * 100) : 0;
                 return (
-                  <Link key={p.id} href={`/products/${p.id}`}>
+                  <Link key={p.id} href={productPath(p)}>
                     <Card className="overflow-hidden h-full hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer" data-testid={`pdp-recent-${p.id}`}>
                       <ProductLogoBanner
                         name={p.name}

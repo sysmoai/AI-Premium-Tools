@@ -54,7 +54,6 @@ export default function Terms() {
             <ul className="list-disc pl-5 text-muted-foreground space-y-1">
               <li>Use the subscription only for the duration purchased.</li>
               <li>Comply with the underlying tool's own terms of service.</li>
-              <li>For shared plans: do not change the password — it locks other users out and voids your warranty.</li>
               <li>Do not resell or sub-licence the credentials we provide unless you have explicitly purchased a reseller package.</li>
             </ul>
           </section>

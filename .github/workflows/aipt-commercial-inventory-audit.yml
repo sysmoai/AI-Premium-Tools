@@ -1,0 +1,134 @@
+name: AIPT Commercial Inventory Audit
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/aipt-commercial-inventory-audit.yml'
+      - 'scripts/aipt-commercial-inventory-audit.mjs'
+      - 'functions/internal/aipt-commercial-audit.ts'
+  workflow_dispatch:
+  workflow_run:
+    workflows: ['Validate and Deploy AIPT']
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aipt-commercial-inventory-audit
+  cancel-in-progress: true
+
+jobs:
+  public-audit:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+
+      - name: Capture public production SKU inventory
+        run: node scripts/aipt-commercial-inventory-audit.mjs
+
+      - name: Upload public catalog-only audit evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: aipt-commercial-public-inventory-${{ github.sha }}
+          path: |
+            /tmp/aipt-commercial-inventory.json
+            /tmp/aipt-commercial-inventory.md
+          if-no-files-found: error
+          retention-days: 14
+
+  internal-audit:
+    if: github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Request short-lived GitHub OIDC identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          response=$(curl --fail --silent --show-error \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=aipt-commercial-audit")
+          token=$(printf '%s' "$response" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!x.value)process.exit(1);process.stdout.write(x.value)})')
+          echo "::add-mask::$token"
+          printf '%s' "$token" > /tmp/aipt-commercial-oidc-token
+          unset token response
+
+      - name: Capture authenticated D1 commercial-state inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          token=$(cat /tmp/aipt-commercial-oidc-token)
+          code=$(curl --silent --show-error --connect-timeout 10 --max-time 60 \
+            --request POST \
+            --header "Authorization: Bearer ${token}" \
+            --header 'Accept: application/json' \
+            --output /tmp/aipt-commercial-internal.json \
+            --write-out '%{http_code}' \
+            'https://aipremium.tools/internal/aipt-commercial-audit')
+          test "$code" = '200'
+          node <<'NODE'
+          const fs = require('fs');
+          const x = JSON.parse(fs.readFileSync('/tmp/aipt-commercial-internal.json', 'utf8'));
+          const allowed = new Set(['CUSTOMER_OWNED','AUTHORIZED_SEAT','HOLD','PROHIBITED']);
+          if (x.status !== 'ok' || x.catalog_only !== true || !Array.isArray(x.rows) || x.rows.length < 1) {
+            throw new Error('Internal commercial inventory response is invalid');
+          }
+          const invalid = x.rows.filter((row) => !Number.isInteger(Number(row?.id)) || !String(row?.name || '').trim() || !allowed.has(String(row?.commercial_state || '')));
+          if (invalid.length) throw new Error(`Internal inventory contains ${invalid.length} invalid row(s)`);
+          const lines = [
+            '# AIPT-0103 authenticated D1 commercial-state inventory',
+            '',
+            `Captured: ${x.captured_at}`,
+            `Active products: ${x.active_products}`,
+            '',
+            '## Internal D1 commercial-state counts',
+            ...Object.entries(x.commercial_state_counts || {}).map(([state,count]) => `- ${state}: ${count}`),
+            '',
+            '| ID | Product | D1 state | SKU | Plan | Delivery | Slug |',
+            '|---:|---|---|---|---|---|---|',
+            ...x.rows.map((row) => `| ${row.id} | ${String(row.name).replace(/\|/g,'\\|')} | ${row.commercial_state} | ${row.sku || '—'} | ${row.plan_type || '—'} | ${row.delivery_type || '—'} | ${row.slug || '—'} |`),
+            '',
+            '> OIDC-authenticated catalog-only D1 audit. No customer, order, payment, credential, or admin-auth data is returned.',
+          ];
+          const markdown = lines.join('\n') + '\n';
+          fs.writeFileSync('/tmp/aipt-commercial-internal.md', markdown);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown);
+          console.log(markdown);
+          NODE
+          unset token
+
+      - name: Verify internal audit is not publicly GET-readable
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            'https://aipremium.tools/internal/aipt-commercial-audit')
+          test "$code" = '404'
+
+      - name: Upload authenticated catalog-only evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: aipt-commercial-internal-inventory-${{ github.sha }}
+          path: |
+            /tmp/aipt-commercial-internal.json
+            /tmp/aipt-commercial-internal.md
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove authentication trace
+        if: always()
+        run: rm -f /tmp/aipt-commercial-oidc-token /tmp/aipt-commercial-internal.json /tmp/aipt-commercial-internal.md

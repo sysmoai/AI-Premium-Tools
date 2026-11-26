@@ -9,6 +9,7 @@ import { useListProducts, useListCategories } from "@workspace/api-client-react"
 import { useInView } from "@/hooks/use-in-view";
 import { WHATSAPP_URL } from "@/config/contact";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
+import { productPath } from "@/lib/product-path";
 import { useSeo } from "@/hooks/use-seo";
 import { useRecentlyViewed } from "@/hooks/use-recently-viewed";
 import { Clock as ClockIcon } from "lucide-react";
@@ -82,10 +83,10 @@ export default function Home({ onAddToCart }: HomeProps) {
     },
     {
       q: "What if my AI subscription stops working?",
-      a: "Message AIPT on WhatsApp with your order ID — we replace failed accounts free of charge during the 30-day warranty window.",
+      a: "Message AIPT on WhatsApp with your order ID. Replacements and refunds follow the AIPT Refund & Replacement Policy, linked at the bottom of every page.",
     },
     {
-      q: "Why is AIPT cheaper than buying directly from the vendor?",
+      q: "How does AIPT pricing work?",
       a: "Direct vendor pricing in Bangladesh adds 15% VAT plus FX markup, and requires an international credit card. AIPT pools verified subscriptions and bills locally in BDT, passing the savings to Bangladeshi students, freelancers, and creators.",
     },
   ];
@@ -275,8 +276,8 @@ export default function Home({ onAddToCart }: HomeProps) {
             <strong>AIPT (AI Premium Tools)</strong> is a Bangladesh-based store for premium AI subscriptions —
             ChatGPT Plus, Claude Pro, Midjourney, Canva Pro, Notion AI, Grammarly Premium and {totalToolsCount}+ more.
             We accept <strong>bKash, Nagad, Rocket, Upay, and bank transfer</strong> in BDT.
-            Most orders are delivered to your WhatsApp within <strong>1 hour</strong>, and every subscription is
-            covered by a <strong>30-day replacement warranty</strong>. AIPT operates daily 10am–11pm Bangladesh time.
+            After payment verification, AIPT confirms the supported activation method and expected timing, and every subscription is
+            supported on WhatsApp using your order ID. AIPT operates daily 10am–11pm Bangladesh time.
           </p>
         </div>
       </section>
@@ -302,7 +303,7 @@ export default function Home({ onAddToCart }: HomeProps) {
               const grad = getProductGradient(p.name);
               const sav = p.original_price_bdt ? Math.round((1 - p.price_bdt / p.original_price_bdt) * 100) : 0;
               return (
-                <Link key={p.id} href={`/products/${p.id}`}>
+                <Link key={p.id} href={productPath(p)}>
                   <Card
                     className="overflow-hidden h-full hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer"
                     data-testid={`recent-product-${p.id}`}
@@ -449,7 +450,7 @@ export default function Home({ onAddToCart }: HomeProps) {
                         <div className="text-xs text-muted-foreground">{product.duration_days || 30} days</div>
                       </div>
                       <div className="flex gap-2">
-                        <Link href={`/products/${product.id}`}>
+                        <Link href={productPath(product)}>
                           <Button variant="outline" size="sm" data-testid={`btn-details-${product.id}`}>Details</Button>
                         </Link>
                         <Button
@@ -477,9 +478,9 @@ export default function Home({ onAddToCart }: HomeProps) {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { icon: <Zap className="h-6 w-6" />, title: "15–20% Lower Prices", desc: "We pass the savings directly to students. Same tools, better price — always." },
-              { icon: <Users className="h-6 w-6" />, title: "Student-First Packages", desc: "8 exclusive bundles designed for university life — research, design, writing, and more." },
-              { icon: <Clock className="h-6 w-6" />, title: "Access in 1 Hour", desc: "Pay via bKash, Nagad, or bank transfer. Get your AI tools delivered within 1 hour." },
+              { icon: <Zap className="h-6 w-6" />, title: "Clear BDT Pricing", desc: "Each listed plan shows its current service price in BDT before you order." },
+              { icon: <Users className="h-6 w-6" />, title: "Local Support", desc: "Ask AIPT on WhatsApp in Bangla or English before and after you order." },
+              { icon: <Clock className="h-6 w-6" />, title: "Activation Support", desc: "Pay via bKash, Nagad, or bank transfer. AIPT confirms the supported activation method after payment verification." },
             ].map(item => (
               <div key={item.title} className="text-center">
                 <div
@@ -496,58 +497,21 @@ export default function Home({ onAddToCart }: HomeProps) {
         </div>
       </section>
 
-      {/* Customer testimonials */}
-      <section className="max-w-6xl mx-auto px-4 py-16" data-testid="section-testimonials">
-        <div className="text-center mb-10">
-          <h2 className="text-3xl font-bold mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>
-            What our customers say
-          </h2>
-          <p className="text-muted-foreground">Real reviews from Bangladeshi students, freelancers and creators</p>
-        </div>
+      {/* How AIPT checks plans. Not testimonials: no names, quotes or stars. */}
+      <section className="max-w-6xl mx-auto px-4 py-16" data-testid="section-how-aipt-works">
+        <h2 className="text-3xl font-bold mb-10 text-center" style={{ fontFamily: "Outfit, sans-serif" }}>
+          How AIPT checks every plan
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {[
-            {
-              name: "Tahmid R.",
-              role: "Freelance designer · Dhaka",
-              quote: "Got my Midjourney within 40 minutes of paying via bKash. Been using it for 4 months without a single issue. Saved me thousands of taka vs paying directly.",
-              tool: "Midjourney",
-            },
-            {
-              name: "Sumaiya I.",
-              role: "BUET student · Researcher",
-              quote: "ChatGPT Plus at this price is unbeatable in BD. Support replied to my WhatsApp in 5 minutes when I had a login question. Will keep renewing.",
-              tool: "ChatGPT Plus",
-            },
-            {
-              name: "Imran H.",
-              role: "Content creator · Chittagong",
-              quote: "Tried two other sellers before AIPT — both had problems. AIPT delivered within an hour and gave a real warranty. This is the only place I buy from now.",
-              tool: "Canva Pro",
-            },
+            { title: "Order-linked reviews", body: "Reviews on product pages are marked verified only when they can be linked to a matching order." },
+            { title: "Approved prices", body: "Direct-sale prices come from the approved AIPT register. Plans that cannot be verified are held for confirmation." },
+            { title: "Supported access", body: "AIPT does not sell shared-credential offers and confirms the access method before activation." },
           ].map(t => (
-            <Card key={t.name} className="h-full">
-              <CardContent className="p-6 flex flex-col h-full">
-                <div className="flex items-center gap-0.5 mb-3">
-                  {[1, 2, 3, 4, 5].map(n => (
-                    <Star key={n} className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden="true" />
-                  ))}
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed mb-4 flex-1">"{t.quote}"</p>
-                <div className="flex items-center gap-3 pt-3 border-t border-border">
-                  <div
-                    className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
-                    style={{ background: "linear-gradient(135deg, hsl(262 83% 58%), hsl(220 90% 60%))" }}
-                  >
-                    {t.name.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-semibold text-sm">{t.name}</div>
-                    <div className="text-xs text-muted-foreground truncate">{t.role}</div>
-                  </div>
-                  <div className="ml-auto text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">
-                    {t.tool}
-                  </div>
-                </div>
+            <Card key={t.title} className="h-full">
+              <CardContent className="p-6">
+                <h3 className="font-bold text-lg mb-2">{t.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{t.body}</p>
               </CardContent>
             </Card>
           ))}

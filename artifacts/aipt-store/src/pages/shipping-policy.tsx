@@ -51,7 +51,7 @@ export default function ShippingPolicy() {
           <section>
             <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>Delivery time</h2>
             <ul className="list-disc pl-5 text-muted-foreground space-y-1">
-              <li><strong className="text-foreground">Standard SLA:</strong> within 1 hour of payment confirmation.</li>
+              <li><strong className="text-foreground">Activation timing:</strong> confirmed after payment verification, based on the provider and access method.</li>
               <li><strong className="text-foreground">Business hours:</strong> 10:00am – 11:00pm Bangladesh time, all 7 days of the week.</li>
               <li><strong className="text-foreground">Late-night orders:</strong> any order placed after 11pm is delivered first thing the following morning, typically by 11am.</li>
               <li><strong className="text-foreground">Festival days:</strong> we operate at reduced hours on Eid and government holidays. Orders are still typically delivered the same day.</li>
