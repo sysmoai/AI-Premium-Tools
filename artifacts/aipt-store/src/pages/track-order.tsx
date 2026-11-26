@@ -26,19 +26,19 @@ const STATUS_META: Record<string, { label: string; color: string; Icon: typeof C
     label: "Awaiting payment confirmation",
     color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
     Icon: Clock,
-    desc: "We've received your order and are verifying your payment. This usually takes under 30 minutes during business hours.",
+    desc: "We've received your order and are verifying your payment. Verification time depends on the payment method and business hours.",
   },
   confirmed: {
     label: "Payment confirmed — preparing your account",
     color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
     Icon: AlertCircle,
-    desc: "Payment confirmed! Your account credentials will be delivered to your WhatsApp within 1 hour.",
+    desc: "Payment confirmed! AIPT will share the supported activation details on WhatsApp.",
   },
   delivered: {
     label: "Delivered",
     color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
     Icon: CheckCircle,
-    desc: "Your order has been delivered. Check your WhatsApp for login credentials. Enjoy!",
+    desc: "Your order has been delivered. Check your WhatsApp for activation details.",
   },
   cancelled: {
     label: "Cancelled",
@@ -241,19 +241,19 @@ export default function TrackOrder() {
                   {
                     Icon: Clock,
                     title: "Awaiting payment confirmation",
-                    desc: "We verify your bKash / Nagad / bank transaction. Usually under 30 minutes (10am–11pm BD).",
+                    desc: "We verify your bKash / Nagad / bank transaction during business hours (10am–11pm BD).",
                     tone: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
                   },
                   {
                     Icon: AlertCircle,
                     title: "Payment confirmed — preparing your account",
-                    desc: "We're sourcing your account from official channels and getting it ready for delivery.",
+                    desc: "We're preparing the supported activation method for your order.",
                     tone: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
                   },
                   {
                     Icon: CheckCircle,
                     title: "Delivered to WhatsApp",
-                    desc: "Login credentials sent — usually within 1 hour. 30-day replacement warranty kicks in.",
+                    desc: "Activation details shared on WhatsApp. Contact AIPT with your order ID if access changes.",
                     tone: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
                   },
                 ].map((s, i, arr) => (

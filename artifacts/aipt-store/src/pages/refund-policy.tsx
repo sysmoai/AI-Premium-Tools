@@ -71,7 +71,7 @@ export default function RefundPolicy() {
           <section>
             <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>Why we prefer replacement over cash refund</h2>
             <p className="text-muted-foreground">
-              After a successful delivery we offer free replacement instead of a cash refund. This keeps our prices the lowest in Bangladesh — refund processing fees on bKash and Nagad are real costs, and absorbing them on every order would force prices up for everyone.
+              After a successful delivery we offer free replacement instead of a cash refund.
             </p>
           </section>
 
@@ -79,7 +79,7 @@ export default function RefundPolicy() {
             <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "Outfit, sans-serif" }}>What is not covered</h2>
             <ul className="list-disc pl-5 text-muted-foreground space-y-1">
               <li>Buyer's remorse after the account has been used.</li>
-              <li>Account locks caused by the customer changing the password on a shared plan or violating the tool's own terms of service.</li>
+              <li>Account locks caused by the customer violating the tool's own terms of service.</li>
               <li>Issues with the underlying tool that the vendor resolves (we will help you escalate).</li>
             </ul>
           </section>
