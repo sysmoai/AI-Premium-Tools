@@ -26,7 +26,7 @@ AIPT production is fully hosted on Cloudflare and does not depend on Replit, Ver
 | Media/object storage | Cloudflare R2, binding `MEDIA` |
 | R2 bucket | `aipt-media` |
 | Production config | repo-root `wrangler.toml` |
-| Automated deployment | `.github/workflows/deploy.yml` |
+| Validation pipeline (production publish disabled, see section 5) | `.github/workflows/deploy.yml` |
 | Production monitoring | `.github/workflows/continuous-production-monitor.yml` and related integrity/audit workflows |
 | Production backup | `.github/workflows/aipt-production-backup.yml` + encrypted recovery Functions |
 
