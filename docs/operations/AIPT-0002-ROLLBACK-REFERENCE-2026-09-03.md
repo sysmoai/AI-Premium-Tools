@@ -76,3 +76,19 @@ PASS for source rollback checkpoint.
 Deferred sub-item: create the matching immutable Git tag/release when an authenticated tag/release write action becomes available.
 
 Next execution task should continue the protection wave without changing the storefront behavior.
+
+---
+
+## Update — 2026-11-26: current rollback chain
+
+The 2026-09-03 source reference above remains valid as the pre-growth baseline. For application rollback today, use the Cloudflare Pages deployment history of `ai-premium-tools` (Deployments > choose deployment > Rollback). Newest first:
+
+| Deployment | Commit | Change |
+|---|---|---|
+| `a9698385-104f-4c1e-a39c-62a0b13c2cda` | `fdf40c9` | Current production: refund and replacement answers point to the policy (#824) |
+| `d7c7f548-3370-4673-a43c-8263c75349f1` | `34cacf6` | Product copy, search metadata and policy text (#823) |
+| `82718461-55d4-4a2b-80c6-1832c3ce7620` | `fa6661e` | Product slug URLs (#821). Rolling back further makes slug URLs 404; browsers may keep the 301 for up to 1 hour |
+| `8a1a1471-694f-4c46-9e9e-684b04e1f24a` | `4d4baac` | SEO routing and real 404s (#764, #762, #818) |
+| `4a83c4e0-9ff5-45a0-ac04-17359ff663d0` | `b444ff1` | Last deployment before the November releases |
+
+A Pages rollback restores code only. D1 product data changed on 2026-11-25 (features and dead image links only); its guarded rollback SQL is kept with the owner's offline recovery records, not in this repository. No deployment in this chain needs a D1 migration rollback: the target is still `0002`.
