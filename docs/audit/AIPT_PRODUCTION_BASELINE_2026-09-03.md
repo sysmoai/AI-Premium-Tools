@@ -308,3 +308,23 @@ Before any growth or redesign PR is allowed to deploy, compare against this base
 
 ### Next step
 Proceed to **AIPT-0002 — create a formal Git release tag / protected baseline commit reference** before growth work.
+
+---
+
+## 16. Status update — 2026-11-26
+
+Sections 1–15 are the 2026-09-03 baseline and are kept unchanged as the comparison point. The production state has since changed as follows:
+
+| Item | 2026-11-26 value |
+|---|---|
+| `main` | `fdf40c9e6e1caa1a31b6ffbc06c1e2ce25fcfd66` (PR #824) |
+| `main` protection | Ruleset "AIPT main protection" (active): pull request, required `validate` check, no force-push, no deletion |
+| Production deployment | `a9698385-104f-4c1e-a39c-62a0b13c2cda` (Direct Upload, commit `fdf40c9`) |
+| Previous deployment (first rollback target) | `d7c7f548-3370-4673-a43c-8263c75349f1` (commit `34cacf6`) |
+| D1 migration target | `0002_catalog_media_foundation.sql` (unchanged) |
+| Live catalog | 25 sellable products of 71 rows; product URLs are slugs (`/products/chatgpt-plus`); numeric URLs 301 to the slug |
+| Unknown routes / non-sellable products | HTTP 404 with `x-robots-tag: noindex` |
+| Sitemap | 35 URLs (10 static, 25 product slugs), generated from D1 |
+| Deep SEO audit | P0 0, P1 0, P2 2 (short descriptions; first-party media) |
+
+Since the baseline: the storefront returns real 404s (#764), product claims and policy text were aligned with what AIPT sells (#762, #823, #824), and product pages moved to slugs (#821). The `deploy-production` job is disabled (`if: ${{ false }}`) while incident #302 is open, so releases are made with `wrangler pages deploy` pinned to a merged `main` commit. See `PRODUCTION_SETUP.md`.
