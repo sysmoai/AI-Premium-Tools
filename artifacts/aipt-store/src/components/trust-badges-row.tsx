@@ -1,9 +1,9 @@
 import { ShieldCheck, Zap, RefreshCw, Lock } from "lucide-react";
 
 const BADGES = [
-  { Icon: ShieldCheck, title: "30-day warranty", subtitle: "Account replaced if anything fails" },
-  { Icon: Zap, title: "1-hour delivery", subtitle: "After payment confirmation" },
-  { Icon: RefreshCw, title: "Easy replacement", subtitle: "Free swap during warranty" },
+  { Icon: ShieldCheck, title: "Support included", subtitle: "Issue review via WhatsApp" },
+  { Icon: Zap, title: "Activation support", subtitle: "Method confirmed after payment" },
+  { Icon: RefreshCw, title: "Order-linked support", subtitle: "Based on order and provider status" },
   { Icon: Lock, title: "Safe payments", subtitle: "bKash · Nagad · Bank" },
 ];
 
