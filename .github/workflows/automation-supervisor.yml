@@ -2,16 +2,8 @@ name: AIPT Automation Supervisor
 
 on:
   schedule:
-    - cron: '2,17,32,47 * * * *'
+    - cron: '32 */6 * * *'
   workflow_dispatch:
-  workflow_run:
-    workflows:
-      - 'Validate and Deploy AIPT'
-      - 'Continuous AIPT Production Monitor'
-      - 'AIPT Commerce and Data Integrity Watch'
-      - 'AIPT Hourly Code and Security Quality Watch'
-      - 'Deep AIPT SEO and Content Audit'
-    types: [completed]
   pull_request:
     paths:
       - '.github/workflows/automation-supervisor.yml'
@@ -49,7 +41,7 @@ jobs:
           cat > "$REPORT" <<'EOF'
           # AIPT automation supervisor
 
-          This control-plane job checks whether independent AIPT watchdogs are actually running. It wakes both on its own staggered cron and whenever another key AIPT workflow completes. It dispatches missing/stale watchdogs, and it immediately retries a failed watchdog when `main` has advanced since that failed run so a newly deployed fix does not wait for the next cron slot.
+          This control-plane job checks whether independent AIPT watchdogs are running. It runs every 6 hours (and on demand) and dispatches only missing, stale, or superseded-failure watchdogs. Watchdog completions do not wake it, so it cannot start a retry cascade.
 
           EOF
 
@@ -97,10 +89,10 @@ jobs:
             fi
           }
 
-          check_workflow 'continuous-production-monitor.yml' 'Production monitor' 40
-          check_workflow 'commerce-data-integrity-watch.yml' 'Commerce/data integrity watchdog' 40
-          check_workflow 'hourly-code-quality-watch.yml' 'Code/security quality watchdog' 120
-          check_workflow 'deep-seo-content-audit.yml' 'Deep SEO/content audit' 420
+          check_workflow 'continuous-production-monitor.yml' 'Production monitor' 90
+          check_workflow 'commerce-data-integrity-watch.yml' 'Commerce/data integrity watchdog' 390
+          check_workflow 'hourly-code-quality-watch.yml' 'Code/security quality watchdog' 1560
+          check_workflow 'deep-seo-content-audit.yml' 'Deep SEO/content audit' 10260
 
           echo >> "$REPORT"
           if [ "$CONTROL_FAILURES" -gt 0 ]; then

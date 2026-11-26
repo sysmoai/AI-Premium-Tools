@@ -2,7 +2,7 @@ name: AIPT Commerce and Data Integrity Watch
 
 on:
   schedule:
-    - cron: '7,22,37,52 * * * *'
+    - cron: '22 */6 * * *'
   workflow_dispatch:
   workflow_run:
     workflows: ['Validate and Deploy AIPT']
