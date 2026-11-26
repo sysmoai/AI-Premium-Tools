@@ -5,7 +5,7 @@
 **Production database:** Cloudflare D1 `aipt-db`  
 **Production media bucket:** Cloudflare R2 `aipt-media`  
 **Current verified D1 migration target:** `0002_catalog_media_foundation.sql`  
-**Last reconciled against production architecture:** 2026-09-03
+**Last reconciled against production architecture:** 2026-11-26
 
 > This document describes the current AIPT production system. It is an operational runbook, not a historical setup note. If code, Cloudflare bindings, migrations, deployment automation, or recovery architecture changes, update this file in the same change set.
 
@@ -132,79 +132,64 @@ For a new migration:
 
 Do not replace this sequence with ad-hoc `schema.sql` execution against production.
 
-## 5. GitHub Actions deployment is live
+## 5. Deployment pipeline: validation runs, production publish is disabled
 
-The historical statement that GitHub Actions was billing-locked or that AIPT required routine manual deploys is no longer true.
+`.github/workflows/deploy.yml` validates every pull request and every push to `main`:
 
-`.github/workflows/deploy.yml` is the canonical validation/deployment pipeline.
+1. checkout, pnpm and Node.js setup;
+2. repository/business-unit isolation guard and design-freeze guard;
+3. frozen dependency install;
+4. repository typecheck;
+5. storefront tests;
+6. local D1 migration validation;
+7. storefront production build, including the pricing audit and the commercial claim build guard.
 
-### Pull requests
+The `deploy-production` job is **disabled** (`if: ${{ false }}`) while incident #302 is open. It is bound to the `Production` environment, which has a required reviewer with self-review prevented. Re-enabling it needs a Pages deploy credential in that environment and a reviewer other than the person who starts the run.
 
-On `pull_request`, the workflow validates but does not deploy production. It currently performs:
+`main` is protected by the ruleset "AIPT main protection": changes land only through a pull request with a passing `validate` check; force-push and deletion are blocked.
 
-1. checkout;
-2. pnpm setup;
-3. Node.js setup;
-4. frozen dependency install;
-5. repository typecheck;
-6. storefront tests;
-7. local D1 migration validation;
-8. storefront production build.
+## 6. Production release procedure (current)
 
-### Push to `main` / manual workflow dispatch
+Until #302 is closed, production is released by the owner from an operator workstation with an existing Wrangler login (OAuth), never with a token stored in GitHub:
 
-For non-PR execution after validation succeeds, the production job additionally:
-
-1. rebuilds the storefront;
-2. verifies the repository migration target and approved migration set;
-3. verifies the Cloudflare Pages project's production `DB` binding points to the exact expected D1 database ID;
-4. deploys the static build plus Pages Functions to Cloudflare Pages with Wrangler;
-5. captures the immutable `*.ai-premium-tools.pages.dev` deployment URL;
-6. verifies the immutable deployment health, product API, and D1 schema health;
-7. waits for canonical edge propagation;
-8. verifies `https://aipremium.tools`, checkout, products API, and production D1 schema state.
-
-A failed validation or invariant check stops the deployment path.
-
-## 6. Production deployment commands
-
-Routine production releases should use the GitHub Actions pipeline rather than workstation-driven deploys.
-
-The underlying build command used by CI is equivalent to:
+1. Merge the change to `main` through a pull request with a green `validate` check.
+2. Clone `main` at the merged commit into a clean directory and confirm `d1/PRODUCTION_MIGRATION_TARGET` is still `0002_catalog_media_foundation.sql`.
+3. Install, typecheck and build exactly as CI does:
 
 ```bash
+pnpm install --frozen-lockfile
+pnpm run typecheck
 PORT=8080 BASE_PATH=/ VITE_SITE_URL=https://aipremium.tools \
   pnpm --filter @workspace/aipt-store run build
 ```
 
-The underlying Pages deployment is equivalent to:
+4. Record the current production deployment id as the rollback target.
+5. Deploy pinned to the merged commit:
 
 ```bash
 pnpm exec wrangler pages deploy artifacts/aipt-store/dist/public \
-  --project-name=ai-premium-tools
+  --project-name=ai-premium-tools --branch=main \
+  --commit-hash=<merged main SHA>
 ```
 
-A manual Wrangler deployment is an emergency/operator fallback, **not** the normal release process. Before using it, reproduce the CI validation gates and confirm the exact Cloudflare account/project/bindings. Do not use a manual deploy to bypass a failing CI invariant.
+6. Verify live: `/api/healthz`, `/api/db-schema`, product API, numeric-to-slug 301s, 404s, sitemap, security headers, checkout page; then run the Production Monitor, Commerce and Data Integrity Watch, and Deep SEO and Content Audit workflows on `main`.
 
-## 7. Runtime secrets and GitHub deployment credentials
+Never deploy an unmerged branch, and never use a manual deploy to get around a failing CI check.
+
+## 7. Runtime secrets and deployment credentials
 
 ### Cloudflare Pages runtime secrets/variables
 
-Production API admin authentication currently depends on runtime values including:
+Production API admin authentication depends on runtime values including:
 
 - `ADMIN_PASSWORD`
 - `SESSION_SECRET`
 
 Never commit their values to the repository, documentation, PRs, issues, logs, or normal database fields.
 
-### GitHub Actions deployment credentials
+### GitHub deployment credentials
 
-The deployment workflow expects repository Actions secrets including:
-
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
-
-Their values must remain secret. The deploy token should have only the permissions needed for its production deployment role.
+There is **no** Cloudflare deploy token in GitHub. The repository has no Actions secrets; the `Production` environment holds only `CLOUDFLARE_ACCOUNT_ID`, which is an identifier, not a credential. The branch workflow audit treats a repository-level `CLOUDFLARE_API_TOKEN` as retired: do not recreate it. Cloudflare Pages permissions cannot be scoped below the account, and the account is shared with other business units (#302), so any future Pages token is account-wide.
 
 ### Backup authentication
 
@@ -278,7 +263,7 @@ For changes affecting checkout/orders/media/admin, test the relevant business fl
 
 ### Source/application rollback
 
-Use the recorded known-good source reference/rollback procedure when an application deployment must be reverted. Prefer targeted reverts over history rewriting.
+Roll back with the Cloudflare Pages deployment history (`ai-premium-tools` > Deployments > Rollback); the current chain is listed in `docs/operations/AIPT-0002-ROLLBACK-REFERENCE-2026-09-03.md`. Then fix forward with a targeted revert on `main`, never history rewriting.
 
 ### D1 rollback/recovery
 
@@ -298,7 +283,7 @@ Cloudflare runtime secrets, bindings, custom-domain/DNS state, and GitHub Action
 2. **Schema/application ordering:** code must not depend on an unapplied production migration.
 3. **R2 namespace safety:** `_aipt-backups/` must never become publicly retrievable through `/media/`.
 4. **Secret hygiene:** no secret values in Git, issues, PR comments, logs, screenshots, or ordinary DB text fields.
-5. **Production deploy discipline:** `main` pushes can trigger a production deployment; use branch/PR validation for ordinary changes.
+5. **Production deploy discipline:** production is published only by the procedure in section 6, from a merged `main` commit.
 6. **No cross-business data mixing:** AIPT production data, assets, pricing, claims, and credentials must remain isolated from AIPS, AITP, SaveOnSub, SYSmoAI, and other portfolio units.
 7. **Notion is not production SSOT:** local Notion-sync code is not a substitute for D1/R2 production truth.
 
