@@ -2,7 +2,7 @@ name: Continuous AIPT Production Monitor
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '17 * * * *'
   workflow_dispatch:
   workflow_run:
     workflows: ['Validate and Deploy AIPT']
