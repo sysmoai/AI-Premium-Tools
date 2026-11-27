@@ -189,7 +189,7 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
           "@type": "Product",
           "@id": `${productUrl}#product`,
           name: product.name,
-          description: baseDesc || `${product.name} subscription available in Bangladesh from AIPT — pay in BDT, 1-hour activation, 30-day replacement warranty.`,
+          description: baseDesc || seoDesc || product.name,
           image: [productImage],
           sku: `AIPT-${product.id}`,
           productID: `AIPT-${product.id}`,
@@ -467,6 +467,11 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
               </button>
             </div>
 
+            {product.short_description && (
+              <p className="text-foreground text-lg font-medium mb-3 leading-snug" data-testid="text-short-description">
+                {product.short_description}
+              </p>
+            )}
             <p className="text-muted-foreground text-base mb-8 leading-relaxed">{product.description}</p>
 
             {/* Tabs: Overview / Included / Delivery / FAQ */}

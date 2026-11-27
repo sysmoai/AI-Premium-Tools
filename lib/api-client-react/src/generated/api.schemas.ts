@@ -16,6 +16,7 @@ export interface Product {
   seo_description?: string;
   name: string;
   description?: string;
+  short_description?: string;
   price_bdt: number;
   original_price_bdt?: number;
   category_id: number;
