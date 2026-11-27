@@ -512,6 +512,8 @@ components:
           type: string
         description:
           type: string
+        short_description:
+          type: string
         price_bdt:
           type: number
         original_price_bdt:

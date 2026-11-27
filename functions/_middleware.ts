@@ -60,6 +60,8 @@ function toPublicProduct(r: ProductRow, slug: string | undefined) {
     id: r.id,
     name: r.name,
     description: r.description ?? undefined,
+    short_description:
+      typeof r.short_description === "string" && r.short_description.trim() ? r.short_description.trim() : undefined,
     price_bdt: Number(r.price_bdt),
     original_price_bdt: r.original_price_bdt != null ? Number(r.original_price_bdt) : undefined,
     category_id: r.category_id,
