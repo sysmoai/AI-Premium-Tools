@@ -7,6 +7,8 @@ interface ByteRange {
   length: number;
 }
 
+const PRIVATE_BACKUP_PREFIX = "_aipt-backups/";
+
 function parseRange(header: string, size: number): ByteRange | null {
   if (!header.startsWith("bytes=")) return null;
   const spec = header.slice(6).trim();
@@ -47,15 +49,22 @@ function baseHeaders(object: R2Object): Headers {
   return headers;
 }
 
+function notFound(): Response {
+  return new Response("Not found", {
+    status: 404,
+    headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" },
+  });
+}
+
 export const onRequestGet: PagesFunction<Env> = async ({ request, params, env }) => {
   const raw = params.key;
   const key = Array.isArray(raw) ? raw.join("/") : String(raw ?? "");
-  if (!key) return new Response("Not found", { status: 404 });
+  if (!key || key.startsWith(PRIVATE_BACKUP_PREFIX)) return notFound();
 
   const rangeHeader = request.headers.get("range");
   if (!rangeHeader) {
     const object = await env.MEDIA.get(key);
-    if (!object) return new Response("Not found", { status: 404 });
+    if (!object) return notFound();
 
     const headers = baseHeaders(object);
     headers.set("content-length", String(object.size));
@@ -63,7 +72,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, params, env })
   }
 
   const metadata = await env.MEDIA.head(key);
-  if (!metadata) return new Response("Not found", { status: 404 });
+  if (!metadata) return notFound();
 
   const range = parseRange(rangeHeader, metadata.size);
   if (!range) {
@@ -78,7 +87,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, params, env })
   }
 
   const object = await env.MEDIA.get(key, { range });
-  if (!object) return new Response("Not found", { status: 404 });
+  if (!object) return notFound();
 
   const headers = baseHeaders(object);
   headers.set("content-length", String(range.length));

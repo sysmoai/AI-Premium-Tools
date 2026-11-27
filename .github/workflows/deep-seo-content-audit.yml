@@ -2,7 +2,7 @@ name: Deep AIPT SEO and Content Audit
 
 on:
   schedule:
-    - cron: '17 */6 * * *'
+    - cron: '17 3 * * 1'
   workflow_dispatch:
   workflow_run:
     workflows: ['Validate and Deploy AIPT']
@@ -128,9 +128,13 @@ jobs:
           const productIds = products
             .map((product) => Number(product?.id))
             .filter((id) => Number.isInteger(id) && id > 0);
-          const missingProductUrls = productIds.filter((id) => !uniqueLocs.has(`${BASE}/products/${id}`));
+          // A product is listed under its slug, or its numeric id when it has none.
+          const missingProductUrls = products
+            .filter((product) => Number.isInteger(Number(product?.id)) && Number(product.id) > 0)
+            .map((product) => String(product.slug || product.id))
+            .filter((ref) => !uniqueLocs.has(`${BASE}/products/${ref}`));
           if (missingProductUrls.length) {
-            add('P0', 'Live products are missing from the sitemap', `Missing product IDs: ${missingProductUrls.slice(0, 30).join(', ')}${missingProductUrls.length > 30 ? '…' : ''}`);
+            add('P0', 'Live products are missing from the sitemap', `Missing products: ${missingProductUrls.slice(0, 30).join(', ')}${missingProductUrls.length > 30 ? '…' : ''}`);
           }
 
           const crawlResults = await pool(locs, 10, async (url) => {

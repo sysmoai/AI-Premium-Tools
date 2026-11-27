@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { useListProducts, useListCategories } from "@workspace/api-client-react";
 import { ProductLogoBanner, getProductGradient } from "@/components/product-logo-banner";
+import { productPath } from "@/lib/product-path";
 import { useSeo } from "@/hooks/use-seo";
 import { SITE_URL } from "@/config/site";
 
@@ -62,8 +63,8 @@ export default function Products({ onAddToCart }: ProductsProps) {
         ? `${activeCat.name} — AI Tools in Bangladesh`
         : "All AI Tools — Affordable Premium Subscriptions in Bangladesh",
     description: activeCat
-      ? `Browse ${activeCat.name} tools at AIPT — Bangladesh's most affordable store for premium AI subscriptions. Pay in BDT via bKash, Nagad or bank.`
-      : `${totalCount}+ premium AI tools at student-friendly prices. ChatGPT, Claude, Midjourney, Canva Pro and more — paid in BDT, activated in 1 hour.`,
+      ? `Browse ${activeCat.name} tools at AIPT — selected premium AI subscriptions with BDT pricing. Pay in BDT via bKash, Nagad or bank.`
+      : `${totalCount}+ premium AI tools at student-friendly prices. ChatGPT, Claude, Midjourney, Canva Pro and more — paid in BDT with supported activation.`,
     keywords: "AI tools Bangladesh, premium AI subscriptions, ChatGPT BDT, Claude BDT, Midjourney BDT, bKash AI",
     type: "website",
     jsonLd: [
@@ -102,7 +103,7 @@ export default function Products({ onAddToCart }: ProductsProps) {
               itemListElement: products.slice(0, 30).map((p, i) => ({
                 "@type": "ListItem",
                 position: i + 1,
-                url: `${ORIGIN}/products/${p.id}`,
+                url: `${ORIGIN}${productPath(p)}`,
                 name: p.name,
               })),
             },
@@ -265,7 +266,7 @@ export default function Products({ onAddToCart }: ProductsProps) {
                 className="group hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 overflow-hidden flex flex-col"
                 data-testid={`card-product-${product.id}`}
               >
-                <Link href={`/products/${product.id}`}>
+                <Link href={productPath(product)}>
                   <div className="cursor-pointer">
                     <ProductLogoBanner
                       name={product.name}
@@ -279,7 +280,7 @@ export default function Products({ onAddToCart }: ProductsProps) {
                 </Link>
 
                 <CardContent className="p-5 flex flex-col flex-1">
-                  <Link href={`/products/${product.id}`}>
+                  <Link href={productPath(product)}>
                     <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors mb-1.5 cursor-pointer">
                       {product.name}
                     </h3>
@@ -288,10 +289,10 @@ export default function Products({ onAddToCart }: ProductsProps) {
                   {/* Trust row — replaces the previous synthetic rating display */}
                   <div className="flex items-center gap-2 mb-2 text-xs">
                     <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-medium">
-                      <ShieldCheck className="h-3 w-3" /> 30-day warranty
+                      <ShieldCheck className="h-3 w-3" /> Order-linked support
                     </span>
                     <span className="ml-auto inline-flex items-center gap-0.5 text-green-600 font-medium">
-                      <Zap className="h-3 w-3" /> 1-hr activation
+                      <Zap className="h-3 w-3" /> Activation confirmed after payment
                     </span>
                   </div>
 
@@ -324,7 +325,7 @@ export default function Products({ onAddToCart }: ProductsProps) {
                       <div className="text-xs text-muted-foreground">{product.duration_days || 30} days</div>
                     </div>
                     <div className="flex gap-2">
-                      <Link href={`/products/${product.id}`}>
+                      <Link href={productPath(product)}>
                         <Button variant="outline" size="sm" data-testid={`btn-details-${product.id}`}>Details</Button>
                       </Link>
                       <Button

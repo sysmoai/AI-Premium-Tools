@@ -1,0 +1,142 @@
+name: AIPT Automation Supervisor
+
+on:
+  schedule:
+    - cron: '32 */6 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/automation-supervisor.yml'
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+
+concurrency:
+  group: aipt-automation-supervisor
+  cancel-in-progress: true
+
+jobs:
+  supervise:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Verify watchdog freshness and self-heal stale or superseded failures
+        id: supervise
+        continue-on-error: true
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          REPORT=/tmp/aipt-automation-supervisor.md
+          RECOVERIES=0
+          CONTROL_FAILURES=0
+          NOW=$(date +%s)
+          MAIN_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')
+
+          cat > "$REPORT" <<'EOF'
+          # AIPT automation supervisor
+
+          This control-plane job checks whether independent AIPT watchdogs are running. It runs every 6 hours (and on demand) and dispatches only missing, stale, or superseded-failure watchdogs. Watchdog completions do not wake it, so it cannot start a retry cascade.
+
+          EOF
+
+          dispatch_recovery() {
+            local workflow="$1"
+            if gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref main; then
+              RECOVERIES=$((RECOVERIES + 1))
+              return 0
+            fi
+            CONTROL_FAILURES=$((CONTROL_FAILURES + 1))
+            return 1
+          }
+
+          check_workflow() {
+            local workflow="$1"
+            local label="$2"
+            local max_age_minutes="$3"
+            local json created status conclusion head_sha age_seconds age_minutes
+
+            json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/runs?branch=main&per_page=1")
+            created=$(printf '%s' "$json" | jq -r '.workflow_runs[0].created_at // empty')
+            status=$(printf '%s' "$json" | jq -r '.workflow_runs[0].status // "missing"')
+            conclusion=$(printf '%s' "$json" | jq -r '.workflow_runs[0].conclusion // "none"')
+            head_sha=$(printf '%s' "$json" | jq -r '.workflow_runs[0].head_sha // empty')
+
+            if [ -z "$created" ]; then
+              echo "- ❌ ${label}: no main-branch workflow run found; dispatching now." | tee -a "$REPORT"
+              dispatch_recovery "$workflow" || true
+              return
+            fi
+
+            age_seconds=$((NOW - $(date -d "$created" +%s)))
+            age_minutes=$((age_seconds / 60))
+
+            if [ "$conclusion" = 'failure' ] && [ -n "$head_sha" ] && [ "$head_sha" != "$MAIN_SHA" ]; then
+              echo "- 🔁 ${label}: latest failure belongs to superseded main ${head_sha:0:8}; current main is ${MAIN_SHA:0:8}. Dispatching immediate post-fix verification." | tee -a "$REPORT"
+              dispatch_recovery "$workflow" || true
+            elif [ "$age_minutes" -gt "$max_age_minutes" ]; then
+              echo "- ⚠️ ${label}: last run is ${age_minutes}m old (limit ${max_age_minutes}m); dispatching recovery run." | tee -a "$REPORT"
+              dispatch_recovery "$workflow" || true
+            elif [ "$conclusion" = 'failure' ]; then
+              echo "- ⚠️ ${label}: fresh failure is already on current main (${age_minutes}m old); leaving remediation to its dedicated incident instead of creating a retry loop." | tee -a "$REPORT"
+            else
+              echo "- ✅ ${label}: fresh (${age_minutes}m old; status=${status}; conclusion=${conclusion}; head=${head_sha:0:8})." | tee -a "$REPORT"
+            fi
+          }
+
+          check_workflow 'continuous-production-monitor.yml' 'Production monitor' 90
+          check_workflow 'commerce-data-integrity-watch.yml' 'Commerce/data integrity watchdog' 390
+          check_workflow 'hourly-code-quality-watch.yml' 'Code/security quality watchdog' 1560
+          check_workflow 'deep-seo-content-audit.yml' 'Deep SEO/content audit' 10260
+
+          echo >> "$REPORT"
+          if [ "$CONTROL_FAILURES" -gt 0 ]; then
+            echo "**CONTROL-PLANE FAILURE — ${CONTROL_FAILURES} recovery dispatch(es) could not be started.**" | tee -a "$REPORT"
+          elif [ "$RECOVERIES" -gt 0 ]; then
+            echo "**RECOVERY DISPATCHED — ${RECOVERIES} stale/missing/superseded watchdog(s) were started successfully.**" | tee -a "$REPORT"
+          else
+            echo '**HEALTHY — all autonomous watchdogs are fresh or have a current-main incident already being tracked.**' | tee -a "$REPORT"
+          fi
+          cat "$REPORT" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$CONTROL_FAILURES" -ne 0 ]; then exit 1; fi
+
+      - name: Validate supervisor syntax on PR
+        if: github.event_name == 'pull_request'
+        run: echo 'Supervisor workflow loaded successfully for PR validation.'
+
+      - name: Open or refresh automation-control incident
+        if: always() && github.event_name != 'pull_request' && steps.supervise.outcome == 'failure'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TITLE='[watch] AIPT automation control-plane incident'
+          NUMBER=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"${TITLE}\") | .number" | head -n 1)
+          if [ -n "$NUMBER" ]; then
+            gh issue edit "$NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/aipt-automation-supervisor.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file /tmp/aipt-automation-supervisor.md
+          fi
+
+      - name: Close recovered automation-control incident
+        if: always() && github.event_name != 'pull_request' && steps.supervise.outcome == 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TITLE='[watch] AIPT automation control-plane incident'
+          NUMBER=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"${TITLE}\") | .number" | head -n 1)
+          if [ -n "$NUMBER" ]; then
+            gh issue close "$NUMBER" --repo "$GITHUB_REPOSITORY" --comment 'Automatically closed after all supervised workflows returned to a fresh/current-main state.'
+          fi
+
+      - name: Fail supervisor only when a recovery dispatch failed
+        if: github.event_name != 'pull_request' && steps.supervise.outcome == 'failure'
+        run: exit 1
