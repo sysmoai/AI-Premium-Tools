@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout governed monitoring baseline
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Verify catalog, D1-facing APIs and commerce guards
         id: verify
